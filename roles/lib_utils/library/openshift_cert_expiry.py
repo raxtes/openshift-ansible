@@ -592,31 +592,31 @@ an OpenShift Container Platform cluster
         for v in cert_meta.values():
             with io.open(v, 'r', encoding='utf-8') as fp:
                 cert = fp.read()
-            # 2023/03/30 Add handling for multiple certs in each input
-            # LOOP THROUGH THE CERTS IN cert
-            certpem = cert
-            if base64decode:
-                certpem = base64.b64decode(cert)
-            for certloop in certsplit(certpem):
+                # 2023/03/30 Add handling for multiple certs in each input
+                # LOOP THROUGH THE CERTS IN cert
+                certpem = cert
                 if base64decode:
-                    certloop = base64.b64encode(certloop)
-                (cert_subject,
-                 cert_expiry_date,
-                 time_remaining,
-                 cert_serial,
-                 issuer) = load_and_handle_cert(certloop, now, ans_module=module)
+                    certpem = base64.b64decode(cert)
+                for certloop in certsplit(certpem):
+                    if base64decode:
+                        certloop = base64.b64encode(certloop)
+                    (cert_subject,
+                     cert_expiry_date,
+                     time_remaining,
+                     cert_serial,
+                     issuer) = load_and_handle_cert(certloop, now, ans_module=module)
 
-                expire_check_result = {
-                    'cert_cn': cert_subject,
-                    'path': fp.name,
-                    'expiry': cert_expiry_date,
-                    'days_remaining': time_remaining.days,
-                    'health': None,
-                    'serial': cert_serial,
-                    'issuer': issuer
-                }
+                    expire_check_result = {
+                        'cert_cn': cert_subject,
+                        'path': fp.name,
+                        'expiry': cert_expiry_date,
+                        'days_remaining': time_remaining.days,
+                        'health': None,
+                        'serial': cert_serial,
+                        'issuer': issuer
+                    }
 
-                classify_cert(expire_check_result, now, time_remaining, expire_window, ocp_certs)
+                    classify_cert(expire_check_result, now, time_remaining, expire_window, ocp_certs)
 
     ######################################################################
     # /Check for OpenShift Container Platform specific certs
@@ -770,31 +770,31 @@ an OpenShift Container Platform cluster
     for etcd_cert in filter_paths(etcd_certs_to_check):
         with io.open(etcd_cert, 'r', encoding='utf-8') as fp:
             c = fp.read()
-        # 2023/03/30 Add handling for multiple certs in each input
-        # LOOP THROUGH THE CERTS IN c (should there be only one?)
-        certpem = c
-        if base64decode:
-            certpem = base64.b64decode(c)
-        for certloop in certsplit(certpem):
+            # 2023/03/30 Add handling for multiple certs in each input
+            # LOOP THROUGH THE CERTS IN c (should there be only one?)
+            certpem = c
             if base64decode:
-                certloop = base64.b64encode(certloop)
-            (cert_subject,
-             cert_expiry_date,
-             time_remaining,
-             cert_serial,
-             issuer) = load_and_handle_cert(certloop, now, ans_module=module)
+                certpem = base64.b64decode(c)
+            for certloop in certsplit(certpem):
+                if base64decode:
+                    certloop = base64.b64encode(certloop)
+                (cert_subject,
+                 cert_expiry_date,
+                 time_remaining,
+                 cert_serial,
+                 issuer) = load_and_handle_cert(certloop, now, ans_module=module)
 
-            expire_check_result = {
-                'cert_cn': cert_subject,
-                'path': fp.name,
-                'expiry': cert_expiry_date,
-                'days_remaining': time_remaining.days,
-                'health': None,
-                'serial': cert_serial,
-                'issuer': issuer
-            }
+                expire_check_result = {
+                    'cert_cn': cert_subject,
+                    'path': fp.name,
+                    'expiry': cert_expiry_date,
+                    'days_remaining': time_remaining.days,
+                    'health': None,
+                    'serial': cert_serial,
+                    'issuer': issuer
+                }
 
-            classify_cert(expire_check_result, now, time_remaining, expire_window, etcd_certs)
+                classify_cert(expire_check_result, now, time_remaining, expire_window, etcd_certs)
 
     ######################################################################
     # /Check etcd certs
@@ -875,23 +875,23 @@ an OpenShift Container Platform cluster
         for certloop in certsplit(certpem):
             if base64decode:
                 certloop = base64.b64encode(certloop)
-                (cert_subject,
-                 cert_expiry_date,
-                 time_remaining,
-                 cert_serial,
-                 issuer) = load_and_handle_cert(certloop, now, base64decode=True, ans_module=module)
+            (cert_subject,
+             cert_expiry_date,
+             time_remaining,
+             cert_serial,
+             issuer) = load_and_handle_cert(certloop, now, base64decode=True, ans_module=module)
 
-                expire_check_result = {
-                    'cert_cn': cert_subject,
-                    'path': registry_path,
-                    'expiry': cert_expiry_date,
-                    'days_remaining': time_remaining.days,
-                    'health': None,
-                    'serial': cert_serial,
-                    'issuer': issuer
-                }
+            expire_check_result = {
+                'cert_cn': cert_subject,
+                'path': registry_path,
+                'expiry': cert_expiry_date,
+                'days_remaining': time_remaining.days,
+                'health': None,
+                'serial': cert_serial,
+                'issuer': issuer
+            }
 
-                classify_cert(expire_check_result, now, time_remaining, expire_window, registry_certs)
+            classify_cert(expire_check_result, now, time_remaining, expire_window, registry_certs)
 
     ######################################################################
     # /Check router/registry certs
