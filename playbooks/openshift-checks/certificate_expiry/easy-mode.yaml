@@ -6,7 +6,7 @@
 #
 # All certificates (healthy or not) are included in the results
 
-# This is unnecessary overhead
+# This is unnecessary overhead for checking the ssl expirations
 #- name: Initialize facts
 #  import_playbook: ../../init/main.yml
 #  vars:
@@ -15,6 +15,7 @@
 
 - name: Check cert expirys
   hosts: nodes:masters:etcd
+  # Don't want to use gather_facts module which requires a lot of time to run
   gather_facts: false
   vars:
     openshift_certificate_expiry_save_json_results: yes

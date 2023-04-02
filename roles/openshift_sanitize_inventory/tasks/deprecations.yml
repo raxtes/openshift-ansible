@@ -7,7 +7,7 @@
     vars: "{{ __warn_deprecated_vars }}"
     header: "{{ __deprecation_header }}"
   register: dep_check
-  no_log: false
+  no_log: true
 
 - block:
   - debug: msg="{{ dep_check.msg }}"
