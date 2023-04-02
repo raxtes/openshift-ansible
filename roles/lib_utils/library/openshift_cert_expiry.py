@@ -240,6 +240,18 @@ object"""
 
 
 ######################################################################
+
+# 2023/03/30 Add handling for multiple certs in each input
+def certsplit(pem):
+    """`pem` - Split cert text into array
+    """
+    start_line = b'-----BEGIN CERTIFICATE-----'
+    result = []
+    certarray = pem.split(start_line)
+    for single in certarray[1:]:
+        result.append(start_line+single)
+    return result
+
 def filter_paths(path_list):
     """`path_list` - A list of file paths to check. Only files which exist
 will be returned
@@ -580,11 +592,19 @@ an OpenShift Container Platform cluster
         for v in cert_meta.values():
             with io.open(v, 'r', encoding='utf-8') as fp:
                 cert = fp.read()
+            # 2023/03/30 Add handling for multiple certs in each input
+            # LOOP THROUGH THE CERTS IN cert
+            certpem = cert
+            if base64decode:
+                certpem = base64.b64decode(cert)
+            for certloop in certsplit(certpem):
+                if base64decode:
+                    certloop = base64.b64encode(certloop)
                 (cert_subject,
                  cert_expiry_date,
                  time_remaining,
                  cert_serial,
-                 issuer) = load_and_handle_cert(cert, now, ans_module=module)
+                 issuer) = load_and_handle_cert(certloop, now, ans_module=module)
 
                 expire_check_result = {
                     'cert_cn': cert_subject,
@@ -644,23 +664,31 @@ an OpenShift Container Platform cluster
             if not c:
                 # This is not a node
                 raise IOError
-            (cert_subject,
-             cert_expiry_date,
-             time_remaining,
-             cert_serial,
-             issuer) = load_and_handle_cert(c, now, base64decode=base64decode, ans_module=module)
+            # 2023/03/30 Add handling for multiple certs in each input
+            # LOOP THROUGH THE CERTS IN c (should there be only one?)
+            certpem = c
+            if base64decode:
+                certpem = base64.b64decode(c)
+            for certloop in certsplit(certpem):
+                if base64decode:
+                    certloop = base64.b64encode(certloop)
+                (cert_subject,
+                 cert_expiry_date,
+                 time_remaining,
+                 cert_serial,
+                 issuer) = load_and_handle_cert(certloop, now, base64decode=base64decode, ans_module=module)
 
-            expire_check_result = {
-                'cert_cn': cert_subject,
-                'path': fp.name,
-                'expiry': cert_expiry_date,
-                'days_remaining': time_remaining.days,
-                'health': None,
-                'serial': cert_serial,
-                'issuer': issuer
-            }
+                expire_check_result = {
+                    'cert_cn': cert_subject,
+                    'path': fp.name,
+                    'expiry': cert_expiry_date,
+                    'days_remaining': time_remaining.days,
+                    'health': None,
+                    'serial': cert_serial,
+                    'issuer': issuer
+                }
 
-            classify_cert(expire_check_result, now, time_remaining, expire_window, kubeconfigs)
+                classify_cert(expire_check_result, now, time_remaining, expire_window, kubeconfigs)
         except IOError:
             # This is not a node
             pass
@@ -676,23 +704,31 @@ an OpenShift Container Platform cluster
         # the user at index 0 in the 'users' list. There should
         # not be more than one user.
         c = cfg['users'][0]['user']['client-certificate-data']
-        (cert_subject,
-         cert_expiry_date,
-         time_remaining,
-         cert_serial,
-         issuer) = load_and_handle_cert(c, now, base64decode=True, ans_module=module)
+        # 2023/03/30 Add handling for multiple certs in each input
+        # LOOP THROUGH THE CERTS IN c (should there be only one?)
+        certpem = c
+        if base64decode:
+            certpem = base64.b64decode(c)
+        for certloop in certsplit(certpem):
+            if base64decode:
+                certloop = base64.b64encode(certloop)
+            (cert_subject,
+             cert_expiry_date,
+             time_remaining,
+             cert_serial,
+             issuer) = load_and_handle_cert(certloop, now, base64decode=True, ans_module=module)
 
-        expire_check_result = {
-            'cert_cn': cert_subject,
-            'path': fp.name,
-            'expiry': cert_expiry_date,
-            'days_remaining': time_remaining.days,
-            'health': None,
-            'serial': cert_serial,
-            'issuer': issuer
-        }
+            expire_check_result = {
+                'cert_cn': cert_subject,
+                'path': fp.name,
+                'expiry': cert_expiry_date,
+                'days_remaining': time_remaining.days,
+                'health': None,
+                'serial': cert_serial,
+                'issuer': issuer
+            }
 
-        classify_cert(expire_check_result, now, time_remaining, expire_window, kubeconfigs)
+            classify_cert(expire_check_result, now, time_remaining, expire_window, kubeconfigs)
 
     ######################################################################
     # /Check service Kubeconfigs
@@ -734,11 +770,19 @@ an OpenShift Container Platform cluster
     for etcd_cert in filter_paths(etcd_certs_to_check):
         with io.open(etcd_cert, 'r', encoding='utf-8') as fp:
             c = fp.read()
+        # 2023/03/30 Add handling for multiple certs in each input
+        # LOOP THROUGH THE CERTS IN c (should there be only one?)
+        certpem = c
+        if base64decode:
+            certpem = base64.b64decode(c)
+        for certloop in certsplit(certpem):
+            if base64decode:
+                certloop = base64.b64encode(certloop)
             (cert_subject,
              cert_expiry_date,
              time_remaining,
              cert_serial,
-             issuer) = load_and_handle_cert(c, now, ans_module=module)
+             issuer) = load_and_handle_cert(certloop, now, ans_module=module)
 
             expire_check_result = {
                 'cert_cn': cert_subject,
@@ -782,23 +826,31 @@ an OpenShift Container Platform cluster
         # The OC command doesn't exist here. Move along.
         pass
     else:
-        (cert_subject,
-         cert_expiry_date,
-         time_remaining,
-         cert_serial,
-         issuer) = load_and_handle_cert(router_c, now, base64decode=True, ans_module=module)
+        # 2023/03/30 Add handling for multiple certs in each input
+        # LOOP THROUGH THE CERTS IN router_c
+        certpem = router_c
+        if base64decode:
+            certpem = base64.b64decode(router_c)
+        for certloop in certsplit(certpem):
+            if base64decode:
+                certloop = base64.b64encode(certloop)
+            (cert_subject,
+             cert_expiry_date,
+             time_remaining,
+             cert_serial,
+             issuer) = load_and_handle_cert(certloop, now, base64decode=True, ans_module=module)
 
-        expire_check_result = {
-            'cert_cn': cert_subject,
-            'path': router_path,
-            'expiry': cert_expiry_date,
-            'days_remaining': time_remaining.days,
-            'health': None,
-            'serial': cert_serial,
-            'issuer': issuer
-        }
+            expire_check_result = {
+                'cert_cn': cert_subject,
+                'path': router_path,
+                'expiry': cert_expiry_date,
+                'days_remaining': time_remaining.days,
+                'health': None,
+                'serial': cert_serial,
+                'issuer': issuer
+            }
 
-        classify_cert(expire_check_result, now, time_remaining, expire_window, router_certs)
+            classify_cert(expire_check_result, now, time_remaining, expire_window, router_certs)
 
     ######################################################################
     # Now for registry
@@ -815,23 +867,31 @@ an OpenShift Container Platform cluster
         # The OC command doesn't exist here. Move along.
         pass
     else:
-        (cert_subject,
-         cert_expiry_date,
-         time_remaining,
-         cert_serial,
-         issuer) = load_and_handle_cert(registry_c, now, base64decode=True, ans_module=module)
+        # 2023/03/30 Add handling for multiple certs in each input
+        # LOOP THROUGH THE CERTS IN registry_c
+        certpem = registry_c
+        if base64decode:
+            certpem = base64.b64decode(registry_c)
+        for certloop in certsplit(certpem):
+            if base64decode:
+                certloop = base64.b64encode(certloop)
+                (cert_subject,
+                 cert_expiry_date,
+                 time_remaining,
+                 cert_serial,
+                 issuer) = load_and_handle_cert(certloop, now, base64decode=True, ans_module=module)
 
-        expire_check_result = {
-            'cert_cn': cert_subject,
-            'path': registry_path,
-            'expiry': cert_expiry_date,
-            'days_remaining': time_remaining.days,
-            'health': None,
-            'serial': cert_serial,
-            'issuer': issuer
-        }
+                expire_check_result = {
+                    'cert_cn': cert_subject,
+                    'path': registry_path,
+                    'expiry': cert_expiry_date,
+                    'days_remaining': time_remaining.days,
+                    'health': None,
+                    'serial': cert_serial,
+                    'issuer': issuer
+                }
 
-        classify_cert(expire_check_result, now, time_remaining, expire_window, registry_certs)
+                classify_cert(expire_check_result, now, time_remaining, expire_window, registry_certs)
 
     ######################################################################
     # /Check router/registry certs

@@ -1,9 +1,9 @@
 ---
-- name: Ensure python dateutil library is present
-  package:
-    name: "{{ 'python3-dateutil' if ansible_distribution == 'Fedora' else 'python-dateutil' }}"
-    state: present
-  when: not openshift_is_atomic | bool
+#- name: Ensure python dateutil library is present
+#  package:
+#    name: "{{ 'python3-dateutil' if ansible_distribution == 'Fedora' else 'python-dateutil' }}"
+#    state: present
+#  when: not openshift_is_atomic | bool
 
 - name: Check cert expirys on host
   openshift_cert_expiry:
