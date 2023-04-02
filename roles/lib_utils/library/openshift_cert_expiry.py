@@ -462,6 +462,9 @@ an OpenShift Container Platform cluster
         supports_check_mode=True,
     )
 
+    # set default value
+    base64decode=False
+
     # Basic scaffolding for OpenShift specific certs
     openshift_base_config_path = os.path.realpath(module.params['config_base'])
     openshift_master_config_path = os.path.join(openshift_base_config_path,
