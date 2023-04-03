@@ -5,6 +5,9 @@ ansible --version
 
 ## all these commands are adhoc for the commandline - this is not a script
 
+#### Note #### there is a second script which captures more certs in OC that this script does not look for.
+# $ sh list_ssl_secrets.sh > ssl_secrets_iad.`date +%F`.txt
+
 # This is the branch I created based on branch "release-3.11" 
 $ git clone git@github.com:raxtes/openshift-ansible.git --branch list-ssl-3.11
 $ git branch

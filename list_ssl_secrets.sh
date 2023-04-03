@@ -104,13 +104,15 @@ function show_cert() {
 # dont care about these?
 #openshift-infra heapster-certs tls.crt (per Edward chat 23/03/28)
 
-# Deduplicating - the following are already included in easy-mode.yaml
+# The following are already included in easy-mode.yaml, but including here anyways so we dont miss them.
 #default registry-certificates registry.crt
 #default router-certs tls.crt
 
 # added items to the list below based on our own list of openshift secrets
 
 cat <<EOF |
+default registry-certificates registry.crt
+default router-certs tls.crt
 default router-external-certs tls.crt
 kube-service-catalog apiserver-ssl tls.crt
 kube-service-catalog service-catalog-ssl tls.crt
