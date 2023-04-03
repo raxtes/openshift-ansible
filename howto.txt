@@ -3,15 +3,18 @@
 # https://github.com/openshift/openshift-ansible/issues/11628
 ansible --version
 
+## all these commands are adhoc for the commandline - this is not a script
+
 $ git clone git@github.com:raxtes/openshift-ansible.git --branch release-3.11
 $ git checkout -b new_branch release-3.11
 
-# see what certs are expiring
+# Run Ansible to see what certs are expiring
 $ time ansible-playbook -Ki iad3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
-$ ll cert-expiry-report*
 
+# script places the file in ~ home
+$ ll ~/cert-expiry-report*
 
-# Set this to the correct report for convenience
+# Set this var to the correct report for convenience
 $ export REPORT='cert-expiry-report.......json'
 
 
