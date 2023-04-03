@@ -1,6 +1,18 @@
 #!/bin/bash
 
+# 2023/04/03 Melissa England RARE-1033
+# time has not been allocated to get this into json format due to maintenance status.
+# have to visually scan since the dates are spelled out like 'Apr 10 2023'.
+
 # $ sh list_ssl_secrets.sh > ssl_secrets_iad.`date +%F`.txt
+# $ egrep -o '202[0-9]?' ssl_secrets_iad.2023-04-03.txt | sort | uniq -c
+#      1 2021
+#      5 2022
+#     21 2023
+#      5 2024
+#      9 2025
+#      2 2027
+# $ grep '2023' ssl_secrets_iad.2023-04-03.txt | sort | uniq -c
 
 # some components have been customized from the original script which was provided as an 'example' for us to follow
 
