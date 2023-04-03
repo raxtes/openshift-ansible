@@ -832,6 +832,7 @@ an OpenShift Container Platform cluster
     else:
         # 2023/03/30 Add handling for multiple certs in each input
         # LOOP THROUGH THE CERTS IN router_c
+        base64decode = True
         certpem = router_c
         if base64decode:
             certpem = base64.b64decode(router_c)
@@ -873,6 +874,7 @@ an OpenShift Container Platform cluster
     else:
         # 2023/03/30 Add handling for multiple certs in each input
         # LOOP THROUGH THE CERTS IN registry_c
+        base64decode = True
         certpem = registry_c
         if base64decode:
             certpem = base64.b64decode(registry_c)
