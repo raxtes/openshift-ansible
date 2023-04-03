@@ -5,8 +5,9 @@ ansible --version
 
 ## all these commands are adhoc for the commandline - this is not a script
 
-$ git clone git@github.com:raxtes/openshift-ansible.git --branch release-3.11
-$ git checkout -b new_branch release-3.11
+# This is the branch I created based on branch "release-3.11" 
+$ git clone git@github.com:raxtes/openshift-ansible.git --branch list-ssl-3.11
+# howto create new branch: git checkout -b new_branch existing_branch
 
 # Run Ansible to see what certs are expiring
 $ time ansible-playbook -Ki iad3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
