@@ -709,6 +709,7 @@ an OpenShift Container Platform cluster
         c = cfg['users'][0]['user']['client-certificate-data']
         # 2023/03/30 Add handling for multiple certs in each input
         # LOOP THROUGH THE CERTS IN c (should there be only one?)
+        base64decode = True
         certpem = c
         if base64decode:
             certpem = base64.b64decode(c)

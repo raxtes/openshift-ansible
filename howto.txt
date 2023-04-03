@@ -1,21 +1,24 @@
+# 2023/04/03 Melissa England RARE-1033
 # OPENSHIFT3.11 REQUIRES OLD ANSIBLE 2.6 ... run it on TOOLBOX
 # https://github.com/openshift/openshift-ansible/issues/11628
 ansible --version
 
-$ git clone git@github.com:openshift/openshift-ansible.git --branch release-3.11
+$ git clone git@github.com:raxtes/openshift-ansible.git --branch release-3.11
+$ git checkout -b new_branch release-3.11
 
 # see what certs are expiring
 $ time ansible-playbook -Ki openshift-ansible/iad3 openshift-ansible/playbooks/openshift-checks/certificate_expiry/easy-mode.yaml
 $ ll cert-expiry-report*
 
 
-$ export REPORT='cert-expiry-report.20230322T224426.json'
+# Set this to the correct report for convenience
+$ export REPORT='cert-expiry-report.......json'
 
 
 #######################################################
 
 # what kind of data here
-$ cat cert-expiry-report...json | egrep '^      "' | awk -F'"' '{print $2}' | sort | uniq -c
+$ cat $REPORT | egrep '^      "' | awk -F'"' '{print $2}' | sort | uniq -c
      34 etcd
      34 kubeconfigs
      34 meta
@@ -70,8 +73,6 @@ $ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.rou
 # Count ALL - NON UNIQUE
 $ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[] | {cert_cn,issuer,path,expiry}' -c | wc -l
 175
-
-# double-check by grepping #
 
 ======================================================
 
