@@ -393,7 +393,7 @@ Return:
     return cert_list
 
 
-def tabulate_summary(certificates, kubeconfigs, etcd_certs, router_certs, registry_certs):
+def tabulate_summary(certificates, kubeconfigs, etcd_certs, router_certs, registry_certs, misc_secrets):
     """Calculate the summary text for when the module finishes
 running. This includes counts of each classification and what have
 you.
@@ -410,7 +410,7 @@ Return:
 - `summary_results` (dict) - Counts of each cert type classification
   and total items examined.
     """
-    items = certificates + kubeconfigs + etcd_certs + router_certs + registry_certs
+    items = certificates + kubeconfigs + etcd_certs + router_certs + registry_certs + misc_secrets
 
     summary_results = {
         'system_certificates': len(certificates),
@@ -418,6 +418,7 @@ Return:
         'etcd_certificates': len(etcd_certs),
         'router_certs': len(router_certs),
         'registry_certs': len(registry_certs),
+        'secrets': len(misc_secrets),
         'total': len(items),
         'ok': 0,
         'warning': 0,
@@ -900,10 +901,82 @@ an OpenShift Container Platform cluster
             classify_cert(expire_check_result, now, time_remaining, expire_window, registry_certs)
 
     ######################################################################
+    # Now for misc certs
+    # 2023/03/30 Added extra oc cert checks
+    ######################################################################
+    misc_secrets = []
+    misc_secrets_list = []
+    #these 2 certs are part of registry_certs and router_certs lists
+    #misc_secrets_list.append(['default','registry-certificates','registry.crt'])
+    #misc_secrets_list.append(['default','router-certs','tls.crt'])
+    misc_secrets_list.append(['default','router-external-certs','tls.crt'])
+    misc_secrets_list.append(['kube-service-catalog','apiserver-ssl','tls.crt'])
+    misc_secrets_list.append(['kube-service-catalog','service-catalog-ssl','tls.crt'])
+    misc_secrets_list.append(['openshift-ansible-service-broker','asb-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-ansible-service-broker','etcd-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-console','console-serving-cert','tls.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-cassandra-certs','tls.client.truststore.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-cassandra-certs','tls.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-cassandra-certs','tls.peer.truststore.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-metrics-certs','ca.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-metrics-certs','tls.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-metrics-certs','tls.truststore.crt'])
+    misc_secrets_list.append(['openshift-monitoring','alertmanager-main-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-monitoring','grafana-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-monitoring','kube-state-metrics-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-monitoring','node-exporter-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-monitoring','prometheus-k8s-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-template-service-broker','apiserver-serving-cert','tls.crt'])
+    misc_secrets_list.append(['openshift-web-console','webconsole-serving-cert','tls.crt'])
+
+    for misc_ns,misc_secret,misc_field in misc_secrets_list:
+        misc_subprocess='oc get -n ' + misc_ns + ' secret ' + misc_secret + ' -o yaml'
+
+        try:
+            misc_secrets_list_raw = subprocess.Popen(misc_subprocess.split(),
+                                                    stdout=subprocess.PIPE)
+            misc_ds = yaml.load(misc_secrets_list_raw.communicate()[0])
+            misc_c = misc_ds['data'][misc_field]
+            misc_path = misc_ds['metadata']['selfLink']
+        except TypeError:
+            # YAML couldn't load the result, this is not a master
+            pass
+        except OSError:
+            # The OC command doesn't exist here. Move along.
+            pass
+        else:
+            # 2023/03/30 Add handling for multiple certs in each input
+            # LOOP THROUGH THE CERTS IN misc_c
+            base64decode = True
+            certpem = misc_c
+            if base64decode:
+                certpem = base64.b64decode(misc_c)
+            for certloop in certsplit(certpem):
+                if base64decode:
+                    certloop = base64.b64encode(certloop)
+                (cert_subject,
+                 cert_expiry_date,
+                 time_remaining,
+                 cert_serial,
+                 issuer) = load_and_handle_cert(certloop, now, base64decode=True, ans_module=module)
+
+                expire_check_result = {
+                    'cert_cn': cert_subject,
+                    'path': misc_path,
+                    'expiry': cert_expiry_date,
+                    'days_remaining': time_remaining.days,
+                    'health': None,
+                    'serial': cert_serial,
+                    'issuer': issuer
+                }
+
+                classify_cert(expire_check_result, now, time_remaining, expire_window, misc_secrets)
+
+    ######################################################################
     # /Check router/registry certs
     ######################################################################
 
-    res = tabulate_summary(ocp_certs, kubeconfigs, etcd_certs, router_certs, registry_certs)
+    res = tabulate_summary(ocp_certs, kubeconfigs, etcd_certs, router_certs, registry_certs, misc_secrets)
     warn_certs = bool(res['expired'] + res['warning'])
     msg = "Checked {count} total certificates. Expired/Warning/OK: {exp}/{warn}/{ok}. Warning window: {window} days".format(
         count=res['total'],
@@ -922,12 +995,14 @@ an OpenShift Container Platform cluster
         check_results['etcd'] = [crt for crt in etcd_certs if crt['health'] in ['expired', 'warning']]
         check_results['registry'] = [crt for crt in registry_certs if crt['health'] in ['expired', 'warning']]
         check_results['router'] = [crt for crt in router_certs if crt['health'] in ['expired', 'warning']]
+        check_results['secrets'] = [crt for crt in misc_secrets if crt['health'] in ['expired', 'warning']]
     else:
         check_results['ocp_certs'] = ocp_certs
         check_results['kubeconfigs'] = kubeconfigs
         check_results['etcd'] = etcd_certs
         check_results['registry'] = registry_certs
         check_results['router'] = router_certs
+        check_results['secrets'] = misc_secrets
 
     # Sort the final results to report in order of ascending safety
     # time. That is to say, the certificates which will expire sooner

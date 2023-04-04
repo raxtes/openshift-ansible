@@ -5,9 +5,6 @@ ansible --version
 
 ## all these commands are adhoc for the commandline - this is not a script
 
-#### Note #### there is a second script which captures more certs in OC that this script does not look for.
-# $ sh list_ssl_secrets.sh > ssl_secrets_iad.`date +%F`.txt
-
 # This is the branch I created based on branch "release-3.11" 
 $ git clone git@github.com:raxtes/openshift-ansible.git --branch list-ssl-3.11
 $ git branch
@@ -51,38 +48,38 @@ $ cat $REPORT | jq '.[] | keys'
 
 #######################################################
 # Expired Certs - based on when the report ran (the file paths might be on master, etcd, nodes, etc.)
-$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[] | (select (.health | test("expired"))) | {expiry,cert_cn,issuer,path}' -c | sort | uniq | jq -c
+$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[] | (select (.health | test("expired"))) | {expiry,cert_cn,issuer,path}' -c | sort | uniq | jq -c
 
 #######################################################
 # Search by Expiry Date REGEX (the file paths might be on master, etcd, nodes, etc.)
-$ export EXPIRY='2023-0[1-3]'; cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[] | (select (.expiry | test("'$EXPIRY'"))) | {expiry,cert_cn,issuer,path}' -c | sort | uniq | jq -c
+$ export EXPIRY='2023-0[1-3]'; cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[] | (select (.expiry | test("'$EXPIRY'"))) | {expiry,cert_cn,issuer,path}' -c | sort | uniq | jq -c
 
 #######################################################
 # List ALL - only dates
-$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[] | .expiry' -r | awk '{print $1}' | sort | uniq -c
+$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[] | .expiry' -r | awk '{print $1}' | sort | uniq -c
 
 #######################################################
 # List ALL - only paths
-$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[] | .path' -r | sort | uniq -c
+$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[] | .path' -r | sort | uniq -c
 
 #######################################################
 # List ALL - only cert names
-$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[] | .cert_cn' -r | sort | uniq -c
+$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[] | .cert_cn' -r | sort | uniq -c
 
 #######################################################
 # List ALL - only issuer names
-$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[] | .issuer' -r | sort | uniq -c
+$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[] | .issuer' -r | sort | uniq -c
 
 #######################################################
 # List ALL 
-$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[] | {cert_cn,issuer,path,expiry}' -c | sort | uniq | jq -c
+$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[] | {cert_cn,issuer,path,expiry}' -c | sort | uniq | jq -c
 
 # Count ALL - UNIQUE
-$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[] | {cert_cn,issuer,path,expiry}' -c | sort | uniq | wc -l
+$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[] | {cert_cn,issuer,path,expiry}' -c | sort | uniq | wc -l
 59
 
 # Count ALL - NON UNIQUE
-$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[] | {cert_cn,issuer,path,expiry}' -c | wc -l
+$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[] | {cert_cn,issuer,path,expiry}' -c | wc -l
 175
 
 ======================================================
