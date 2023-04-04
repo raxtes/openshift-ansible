@@ -1,0 +1,325 @@
+# Create an OSEv3 group that contains the master, nodes, etcd, and lb groups.
+# The lb group lets Ansible configure HAProxy as the load balancing solution.
+# Comment lb out if your load balancer is pre-configured.
+[OSEv3:children]
+etcd
+lb
+masters
+new_etcd
+new_masters
+new_nodes
+nodes
+
+# Set variables common for all OSEv3 hosts
+[OSEv3:vars]
+ansible_become=yes
+
+deployment_type=origin
+openshift_release=v3.11
+openshift_image_tag=v3.11.0
+
+openshift_enable_origin_repo=false
+
+containerized=true
+openshift_is_containerized=true
+
+puppetmaster=puppet-master-n01.prod.ord1.cit.rackspace.net
+puppet_environment=prod
+puppet_version=3
+puppet3=True
+tier=prod
+product=rsi-apps
+katello=true
+
+rackspace_https_proxy=https://proxy1.ord1.corp.rackspace.com:3128
+openshift_enable_excluders=false
+
+# added these due to failures on 3.6->3.7 upgrade
+openshift_is_atomic=false
+docker_version=1.13.1
+# this only prevents the migration from being run during the play
+# the migration still must be run before/after the upgrade itself
+openshift_upgrade_pre_storage_migration_enabled=false
+openshift_upgrade_post_storage_migration_enabled=false
+
+# added these due to failures on 3.7->3.9 upgrade
+openshift_enable_service_catalog=false
+ansible_service_broker_install=false
+template_service_broker_install=false
+
+# added for 3.9->3.10 upgrades
+openshift_node_groups=[{'name': 'node-config-master', 'labels': ['node-role.kubernetes.io/master=true']}, {'name': 'node-config-infra', 'labels': ['node-role.kubernetes.io/infra=true', 'region=infra']}, {'name': 'node-config-router', 'labels': ['node-role.kubernetes.io/router=true', 'region=router', 'zone=external']}, {'name': 'node-config-compute', 'labels': ['node-role.kubernetes.io/compute=true', 'region=primary'], 'edits': [{ 'key': 'kubeletArguments.pods-per-core', 'value': ['10']}, { 'key': 'kubeletArguments.image-gc-high-threshold', 'value': ['60']}, { 'key': 'kubeletArguments.image-gc-low-threshold', 'value': ['35']}, { 'key': 'kubeletArguments.system-reserved', 'value': ['cpu=500m,memory=1.5Gi']}, { 'key': 'kubeletArguments.kube-reserved', 'value': ['cpu=500m,memory=1Gi']}, { 'key': 'kubeletArguments.cgroup-driver', 'value': ["systemd"]}]  }]
+
+# added for 3.10->3.11 upgrades
+openshift_certificate_expiry_fail_on_warn=false
+
+
+
+# LDAP auth
+openshift_master_identity_providers=[{'name': 'ad', 'mappingMethod': 'add', 'challenge': 'true', 'login': 'true', 'kind': 'LDAPPasswordIdentityProvider', 'attributes': {'id': ['sAMAccountName'], 'email': ['mail'], 'name': ['displayName'], 'preferredUsername': ['sAMAccountName']}, 'bindDN': 'CN=rsi-binddn service account,OU=ServiceAccounts,DC=RACKSPACE,DC=CORP', 'bindPassword': 'REPLACEME', 'insecure': 'false', 'url': 'ldap://ad.auth.rackspace.com:389/dc=rackspace,dc=corp?sAMAccountName?sub?(&(objectClass=person)(objectClass=user))'}]
+
+# Audit configuration
+openshift_master_audit_config={"enabled": true, "auditFilePath": "/var/log/origin/audit.log", "maximumFileRetentionDays": 10, "maximumFileSizeMegabytes": 100, "maximumRetainedFiles": 5}
+
+# Native high availbility cluster method with optional load balancer.
+# If no lb group is defined installer assumes that a load balancer has
+# been preconfigured. For installation the value of
+# openshift_master_cluster_hostname must resolve to the load balancer
+# or to one or all of the masters defined in the inventory if no load
+# balancer is present.
+openshift_master_cluster_method=native
+openshift_master_cluster_hostname=openshift.rsi.rackspace.net
+openshift_master_cluster_public_hostname=openshift.rsi.rackspace.net
+openshift_master_default_subdomain=devapps.rsi.rackspace.net
+
+# Metric configuration
+#openshift_hosted_metrics_deploy=true
+#openshift_hosted_metrics_storage_kind=nfs
+#openshift_hosted_metrics_storage_access_modes=['ReadWriteOnce']
+#openshift_hosted_metrics_storage_host=
+#openshift_hosted_metrics_storage_nfs_directory=/
+#openshift_hosted_metrics_storage_volume_name=
+#openshift_hosted_metrics_storage_volume_size=20Gi
+openshift_metrics_install_metrics=True
+openshift_metrics_image_version=v3.11.51
+openshift_metrics_cassandra_storage_type=dynamic
+openshift_metrics_cassandra_pvc_prefix=metrics-cassandra
+openshift_metrics_cassandra_replicas=3
+openshift_metrics_cassandra_nodeselector={"region":"infra"}
+openshift_metrics_hawkular_cert=/certs/rsi.rackspace.net.crt
+openshift_metrics_hawkular_key=/certs/rsi.rackspace.net.key
+openshift_metrics_hawkular_ca=/certs/thawte-bundle.crt
+openshift_metrics_hawkular_hostname=metrics.rsi.rackspace.net
+#openshift_hosted_metrics_public_url=https://metrics.rsi.rackspace.net/hawkular/metrics
+
+# Cluster monitoring
+#
+# Cluster monitoring is enabled by default, disable it by setting
+openshift_cluster_monitoring_operator_install=true
+
+openshift_cluster_monitoring_operator_prometheus_storage_enabled=true
+openshift_cluster_monitoring_operator_alertmanager_storage_enabled=true
+
+#
+# Cluster monitoring configuration variables allow setting the amount of
+# storage and storageclass requested through PersistentVolumeClaims.
+#
+openshift_cluster_monitoring_operator_prometheus_retention="21d"
+openshift_cluster_monitoring_operator_prometheus_storage_capacity="200Gi"
+openshift_cluster_monitoring_operator_alertmanager_storage_capacity="10Gi"
+#
+# openshift_cluster_monitoring_operator_prometheus_storage_class_name=""
+# openshift_cluster_monitoring_operator_alertmanager_storage_class_name=""
+
+# Update the time to wait for CRD to be creating by setting
+# openshift_cluster_monitoring_operator_crd_retries=30
+# openshift_cluster_monitoring_operator_crd_delay=30
+
+# Configure the multi-tenant SDN plugin (default is 'redhat/openshift-ovs-subnet')
+os_sdn_network_plugin_name='redhat/openshift-ovs-multitenant'
+
+# Logging configuration
+openshift_logging_master_public_url=https://rsi.rackspace.net:8443
+openshift_logging_master_url=https://master-001.ord1.prod.rsi.rackspace.net:8443
+openshift_logging_image_version=v3.11.51
+openshift_logging_elasticsearch_deployment_type='data-master'
+openshift_logging_elasticsearch_memory_limit='8Gi'
+openshift_logging_elasticsearch_recover_after_time='5m'
+openshift_logging_elasticsearch_storage_group=noreplica-ord
+openshift_logging_elasticsearch_storage_type='dynamic'
+openshift_logging_es_cluster_size=9
+openshift_logging_es_memory_limit=8G
+openshift_logging_es_nodeselector={"region":"infra"}
+openshift_logging_es_number_of_replicas=3
+openshift_logging_es_number_of_shards=6
+openshift_logging_es_pvc_dynamic=true
+openshift_logging_es_pvc_size=200G
+openshift_logging_install_logging=true
+openshift_logging_journal_read_from_head=false
+openshift_logging_kibana_ca=/certs/thawte-bundle.crt
+openshift_logging_kibana_cert=/certs/rsi.rackspace.net.crt
+openshift_logging_kibana_hostname=logs.rsi.rackspace.net
+openshift_logging_kibana_key=/certs/rsi.rackspace.net.key
+openshift_logging_kibana_proxy_debug=false
+#openshift_logging_namespace=logging
+openshift_logging_use_journal=true
+openshift_logging_use_ops=false
+
+# We expand the bulk import because openshift's imagestream requires this much per upstream docs
+openshift_master_image_policy_config={"maxImagesBulkImportedPerRepository": 100}
+
+# Certificate information
+# If you would like openshift_master_named_certificates to be overwritten with
+# the provided value, specify openshift_master_overwrite_named_certificates.
+openshift_master_overwrite_named_certificates=true
+
+# Provide local certificate paths which will be deployed to masters
+openshift_master_named_certificates=[{"certfile": "/certs/rsi.rackspace.net.crt", "keyfile": "/certs/rsi.rackspace.net.key", "names": ["rsi.rackspace.net","metrics.rsi.rackspace.net","openshift.rsi.rackspace.net"], "cafile": "/certs/ca-bundle.crt"}]
+
+# Tune openshift master loglevel. loglevel 2 on OS1.5 is buggy and does verbose, which fills over 4GB a day in logs
+openshift_master_debug_loglevel=1
+
+# Configure SDN cluster network and kubernetes service CIDR blocks. These
+# network blocks should be private and should not conflict with network blocks
+# in your infrastructure that pods may require access to. Can not be changed
+# after deployment.
+# This gives us 172.20.0.0 - 172.23.255.255 for the cluster network
+# Leaving 172.24.0.0/14, 172.28.0.0/14 for additional non-overlapping clusters.
+# The default subnet mask for these is 9, which translates to 14+9=23.
+# Thus /23 per node. Approximately 512 nodes.
+osm_cluster_network_cidr=172.20.0.0/14
+
+# Then for the portal network we have 172.16.0.0 - 172.16.255.255.
+# Apparently 172.17.0.0/16 is reserved for the cluster network and using it breaks the install.
+# Leaving 172.18.0.0/16, 172.19.0.0/16 for additional non-overlapping clusters.
+openshift_master_portal_net=172.16.0.0/16
+
+# Configure our group based project limits
+openshift_master_admission_plugin_config={"ProjectRequestLimit": {"configuration": {"apiVersion":"v1", "kind":"ProjectRequestLimitConfig", "limits": [{"selector":{"level":"admin"}}, {"selector":{"level":"advanced"},"maxProjects":"10"},{"selector":{"level":"project"},"maxProjects":"4"},{"maxProjects":"2"}]}}}
+
+# Add insecure registry to docker and block the public one
+openshift_docker_insecure_registries='172.16.0.0/16'
+openshift_docker_blocked_registries='registry.hub.docker.com'
+
+# Apply updated node defaults
+# pods-per-core: Why 10?
+# image-gc-high-threshold: Trigger garbage collection at 80% disk utilization
+# image-gc-low-threshold: Try to maintain 65% available disk through garbage collection
+# The next 2 come from this article:
+# https://docs.openshift.org/latest/admin_guide/out_of_resource_handling.html#out-of-resource-hard-eviction-thresholds
+# https://docs.openshift.org/latest/admin_guide/out_of_resource_handling.html#out-of-resource-allocatable
+# TODO: eviction-hard: memory.available<500Mi - if we are running out of memory start heavy handed eviction
+# system-reserverd: memory=1.5Gi - maintain this much capacity for system use
+# To enforce the system reserved it appears you have to enable enforcement with cgroups
+# https://docs.openshift.org/1.5/admin_guide/allocating_node_resources.html#node-enforcement
+# cgroup-driver: systemd
+# We thought we needed these but they break things:
+# cgroups-per-qos: true
+# enforce-node-allocatable: "pods" ( must be at this time )
+
+# Enable ntp on masters to ensure proper failover
+openshift_clock_enabled=true
+
+osm_default_node_selector='node-role.kubernetes.io/compute=true'
+openshift_router_selector='node-role.kubernetes.io/infra=true'
+openshift_registry_selector='node-role.kubernetes.io/infra=true'
+
+## ROUTER
+openshift_hosted_router_selector='node-role.kubernetes.io/infra=true'
+openshift_hosted_router_image='openshift/origin-haproxy-router:v3.11.0'
+# Router certificate
+openshift_hosted_router_certificate={"certfile": "/certs/wildcard.devapps.rsi.rackspace.net.crt", "keyfile": "/certs/wildcard.devapps.rsi.rackspace.net.key", "names": ["*.devapps.rsi.rackspace.net"], "cafile": "/certs/thawte-bundle.crt"}
+# Define the number of routers. 1 per scheduable infra node to start.
+openshift_hosted_router_replicas=10
+
+# This is used to ensure persistence when running upstream playbook including the openshift_hosted role.
+# The openshift_hosted.yml playbook should not be run directly for management of the cluster since it can break registry without the ability to config registry hostname
+openshift_hosted_routers=[ {"name": "router", "replicas": "10", "namespace": "default", "serviceaccount": "router", "selector": "region=infra", "images": "openshift/origin-haproxy-router:v3.11.0", "edits": [ { "key": "spec.strategy.rollingParams.intervalSeconds", "value": "1", "action": "put" }, { "key": "spec.strategy.rollingParams.updatePeriodSeconds", "value": "1", "action": "put"}, { "key": "spec.strategy.activeDeadlineSeconds", "value": "21600", "action": "put" }], "stats_port": "1936", "ports":["80:80","443:443"], "certificate": {"certfile": "/certs/wildcard.devapps.rsi.rackspace.net.crt", "keyfile": "/certs/wildcard.devapps.rsi.rackspace.net.key", "names": ["*.devapps.rsi.rackspace.net"], "cafile": "/certs/thawte-bundle.crt"}},{"name": "router-external", "replicas": "4", "namespace": "default", "serviceaccount": "router", "selector": "zone=external", "images": "openshift/origin-haproxy-router:v3.11.0", "edits": [ { "key": "spec.strategy.rollingParams.intervalSeconds", "value": "1", "action": "put" }, { "key": "spec.strategy.rollingParams.updatePeriodSeconds", "value": "1", "action": "put"}, { "key": "spec.strategy.activeDeadlineSeconds", "value": "21600", "action": "put" }, { "key": "spec.template.spec.containers[0].env", "value": {"name": "ROUTE_LABELS", "value": "expose=public"}, "action": "append"}, { "key": "spec.template.spec.containers[0].env", "value": {"name": "NAMESPACE_LABELS", "value": "exposable=yes"}, "action": "append"}], "stats_port": "1936", "ports":["80:80","443:443"], "certificate": {"certfile": "/certs/wildcard.devapps.rsi.rackspace.net.crt", "keyfile": "/certs/wildcard.devapps.rsi.rackspace.net.key", "names": ["*.devapps.rsi.rackspace.net"], "cafile": "/certs/thawte-bundle.crt"}}]
+# openshift_ha_{router,ipf} are controlled by ansible-playbooks/openshift-cluster.yml
+openshift_ha_router_internal={"router_name":"router", "router_replicas":"10", "router_service_account":"router", "router_nodeselector":{"region":"infra"}, "router_image": "openshift/origin-haproxy-router:v3.11.0"}
+openshift_ha_router_external={"router_name":"router-external", "router_replicas":"4", "router_route_labels":"expose=public" , "router_namespace_labels":"exposable=yes", "router_service_account":"router", "router_nodeselector":{"zone":"external"}, "router_image": "openshift/origin-haproxy-router:v3.11.0"}
+
+openshift_ha_ipf_external={"ipf_name":"ipf-external", "ipf_vrrp_id_offset": "2", "ipf_service_account":"router", "ipf_namespace":"default", "ipf_vips":"10.10.155.249-250", "ipf_replicas":"2", "ipf_nodeselector":{"zone":"external"}}
+openshift_ha_ipf_internal={"ipf_name":"ipf-internal", "ipf_vrrp_id_offset": "10", "ipf_service_account":"router", "ipf_namespace":"default", "ipf_vips":"10.10.155.237-240", "ipf_replicas":"4", "ipf_nodeselector":{"region":"infra"}}
+
+#openshift_cluster_monitoring_operator_alertmanager_config={{lookup('file', '{{inventory_dir}}/alertconfig.yml')}}
+
+# When scaling up masters you have to temporarily add them to this group
+[new_masters]
+
+# Host group for masters
+[masters]
+master-001.ord1.prod.rsi.rackspace.net
+master-002.ord1.prod.rsi.rackspace.net
+master-003.ord1.prod.rsi.rackspace.net
+
+# When scaling up etcd you have to temporarily add them to this group
+[new_etcd]
+#etcd-004.ord1.prod.rsi.rackspace.net
+#etcd-005.ord1.prod.rsi.rackspace.net
+
+# Host group for etcd
+[etcd]
+etcd-001.ord1.prod.rsi.rackspace.net
+etcd-002.ord1.prod.rsi.rackspace.net
+etcd-003.ord1.prod.rsi.rackspace.net
+
+# Specify load balancer host
+[lb]
+lb-001.ord1.prod.rsi.rackspace.net
+lb-002.ord1.prod.rsi.rackspace.net
+
+[lb:vars]
+containerized=false
+
+# Specify storage host
+[storage]
+storage-001.ord1.prod.rsi.rackspace.net
+storage-002.ord1.prod.rsi.rackspace.net
+storage-003.ord1.prod.rsi.rackspace.net
+storage-004.ord1.prod.rsi.rackspace.net
+
+# When scaling up nodes you have to temporarily add them to this group
+[new_nodes]
+
+# Host group for nodes, includes region info
+[nodes]
+master-001.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-master 
+master-002.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-master 
+master-003.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-master 
+lb-001.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-router 
+node-001.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-infra 
+node-011.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-012.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+
+lb-002.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-router 
+node-002.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-infra 
+node-013.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-014.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+
+lb-003.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-router 
+node-003.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-infra 
+node-015.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-016.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+
+lb-004.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-router 
+node-004.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-infra 
+node-017.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-018.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+
+node-005.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-infra 
+node-019.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-020.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-021.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+
+node-006.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-infra 
+node-022.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-023.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-024.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+
+node-007.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-infra 
+node-025.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-026.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-027.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+
+node-039.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+#node-008.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-infra 
+node-028.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-029.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-040.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+#node-030.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+
+node-009.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute
+node-031.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-032.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-033.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+
+node-010.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute
+node-034.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-035.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-036.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+
+node-037.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+node-038.ord1.prod.rsi.rackspace.net openshift_node_group_name=node-config-compute 
+
+[nodes:vars]
