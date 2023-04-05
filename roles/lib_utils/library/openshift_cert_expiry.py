@@ -931,16 +931,11 @@ an OpenShift Container Platform cluster
     misc_secrets_list.append(['openshift-web-console','webconsole-serving-cert','tls.crt'])
 
     for misc_ns,misc_secret,misc_field in misc_secrets_list:
-        misc_subprocess='oc get -n ' + misc_ns + ' secret ' + misc_secret + ' -o yaml'
-        # in case a secret does not exist, continue on with simple oc exists check
-        #no idea why this fails but the same code works for route
-        #misc_subprocess='oc get -n ' + misc_ns + ' secret ' + misc_secret + ' -o yaml 2>/dev/null || oc version 1>/dev/null'
 
         try:
+            misc_subprocess='oc get -n ' + misc_ns + ' secret ' + misc_secret + ' -o yaml'
             misc_secrets_list_raw = subprocess.Popen(misc_subprocess.split(),
                                                     stdout=subprocess.PIPE)
-            if not misc_secrets_list_raw:
-                raise TypeError
             misc_ds = yaml.load(misc_secrets_list_raw.communicate()[0])
             misc_c = misc_ds['data'][misc_field]
             misc_path = misc_ds['metadata']['selfLink']
@@ -949,6 +944,9 @@ an OpenShift Container Platform cluster
             pass
         except OSError:
             # The OC command doesn't exist here. Move along.
+            pass
+        except KeyError:
+            # Catch the error when oc object not found
             pass
         else:
             # 2023/03/30 Add handling for multiple certs in each input
@@ -1004,15 +1002,11 @@ an OpenShift Container Platform cluster
     misc_routes_list.append(['openshift-infra','hawkular-metrics','destinationCACertificate'])
 
     for misc_ns,misc_route,misc_field in misc_routes_list:
-        #misc_subprocess='oc get -n ' + misc_ns + ' route ' + misc_route + ' -o yaml'
-        # in case a route does not exist, continue on with simple oc exists check
-        misc_subprocess='oc get -n ' + misc_ns + ' route ' + misc_route + ' -o yaml 2>/dev/null || oc version 1>/dev/null'
 
         try:
+            misc_subprocess='oc get -n ' + misc_ns + ' route ' + misc_route + ' -o yaml'
             misc_routes_list_raw = subprocess.Popen(misc_subprocess.split(),
                                                     stdout=subprocess.PIPE)
-            if not misc_routes_list_raw:
-                raise TypeError
             misc_ds = yaml.load(misc_routes_list_raw.communicate()[0])
             misc_c = misc_ds['spec']['tls'][misc_field]
             misc_path = misc_ds['metadata']['selfLink']
@@ -1021,6 +1015,9 @@ an OpenShift Container Platform cluster
             pass
         except OSError:
             # The OC command doesn't exist here. Move along.
+            pass
+        except KeyError:
+            # Catch the error when oc object not found
             pass
         else:
             # 2023/03/30 Add handling for multiple certs in each input
