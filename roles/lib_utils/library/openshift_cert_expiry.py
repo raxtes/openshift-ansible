@@ -393,7 +393,7 @@ Return:
     return cert_list
 
 
-def tabulate_summary(certificates, kubeconfigs, etcd_certs, router_certs, registry_certs, misc_secrets):
+def tabulate_summary(certificates, kubeconfigs, etcd_certs, router_certs, registry_certs, misc_secrets, misc_routes):
     """Calculate the summary text for when the module finishes
 running. This includes counts of each classification and what have
 you.
@@ -410,7 +410,7 @@ Return:
 - `summary_results` (dict) - Counts of each cert type classification
   and total items examined.
     """
-    items = certificates + kubeconfigs + etcd_certs + router_certs + registry_certs + misc_secrets
+    items = certificates + kubeconfigs + etcd_certs + router_certs + registry_certs + misc_secrets + misc_routes
 
     summary_results = {
         'system_certificates': len(certificates),
@@ -419,6 +419,7 @@ Return:
         'router_certs': len(router_certs),
         'registry_certs': len(registry_certs),
         'secrets': len(misc_secrets),
+        'routes': len(misc_routes),
         'total': len(items),
         'ok': 0,
         'warning': 0,
@@ -901,7 +902,7 @@ an OpenShift Container Platform cluster
             classify_cert(expire_check_result, now, time_remaining, expire_window, registry_certs)
 
     ######################################################################
-    # Now for misc certs
+    # Now for misc secrets certs
     # 2023/03/30 Added extra oc cert checks
     ######################################################################
     misc_secrets = []
@@ -931,10 +932,15 @@ an OpenShift Container Platform cluster
 
     for misc_ns,misc_secret,misc_field in misc_secrets_list:
         misc_subprocess='oc get -n ' + misc_ns + ' secret ' + misc_secret + ' -o yaml'
+        # in case a secret does not exist, continue on with simple oc exists check
+        #no idea why this fails but the same code works for route
+        #misc_subprocess='oc get -n ' + misc_ns + ' secret ' + misc_secret + ' -o yaml 2>/dev/null || oc version 1>/dev/null'
 
         try:
             misc_secrets_list_raw = subprocess.Popen(misc_subprocess.split(),
                                                     stdout=subprocess.PIPE)
+            if not misc_secrets_list_raw:
+                raise TypeError
             misc_ds = yaml.load(misc_secrets_list_raw.communicate()[0])
             misc_c = misc_ds['data'][misc_field]
             misc_path = misc_ds['metadata']['selfLink']
@@ -958,7 +964,7 @@ an OpenShift Container Platform cluster
                  cert_expiry_date,
                  time_remaining,
                  cert_serial,
-                 issuer) = load_and_handle_cert(certloop, now, base64decode=True, ans_module=module)
+                 issuer) = load_and_handle_cert(certloop, now, base64decode=base64decode, ans_module=module)
 
                 expire_check_result = {
                     'cert_cn': cert_subject,
@@ -973,10 +979,82 @@ an OpenShift Container Platform cluster
                 classify_cert(expire_check_result, now, time_remaining, expire_window, misc_secrets)
 
     ######################################################################
+    # Now for misc router certs
+    # 2023/03/30 Added extra oc cert checks
+    ######################################################################
+    misc_routes = []
+    misc_routes_list = []
+    misc_routes_list.append(['default','docker-registry','certificate'])
+    misc_routes_list.append(['default','docker-registry','caCertificate'])
+    misc_routes_list.append(['default','docker-registry','destinationCACertificate'])
+    misc_routes_list.append(['default','docker-registry-new','certificate'])
+    misc_routes_list.append(['default','docker-registry-new','caCertificate'])
+    misc_routes_list.append(['default','docker-registry-new','destinationCACertificate'])
+    misc_routes_list.append(['default','external-registry','certificate'])
+    misc_routes_list.append(['default','external-registry','caCertificate'])
+    misc_routes_list.append(['default','external-registry','destinationCACertificate'])
+    misc_routes_list.append(['default','openshift-master','certificate'])
+    misc_routes_list.append(['default','openshift-master','caCertificate'])
+    misc_routes_list.append(['default','openshift-master','destinationCACertificate'])
+    misc_routes_list.append(['default','registry-console','certificate'])
+    misc_routes_list.append(['default','registry-console','caCertificate'])
+    misc_routes_list.append(['default','registry-console','destinationCACertificate'])
+    misc_routes_list.append(['openshift-infra','hawkular-metrics','certificate'])
+    misc_routes_list.append(['openshift-infra','hawkular-metrics','caCertificate'])
+    misc_routes_list.append(['openshift-infra','hawkular-metrics','destinationCACertificate'])
+
+    for misc_ns,misc_route,misc_field in misc_routes_list:
+        #misc_subprocess='oc get -n ' + misc_ns + ' route ' + misc_route + ' -o yaml'
+        # in case a route does not exist, continue on with simple oc exists check
+        misc_subprocess='oc get -n ' + misc_ns + ' route ' + misc_route + ' -o yaml 2>/dev/null || oc version 1>/dev/null'
+
+        try:
+            misc_routes_list_raw = subprocess.Popen(misc_subprocess.split(),
+                                                    stdout=subprocess.PIPE)
+            if not misc_routes_list_raw:
+                raise TypeError
+            misc_ds = yaml.load(misc_routes_list_raw.communicate()[0])
+            misc_c = misc_ds['spec']['tls'][misc_field]
+            misc_path = misc_ds['metadata']['selfLink']
+        except TypeError:
+            # YAML couldn't load the result, this is not a master
+            pass
+        except OSError:
+            # The OC command doesn't exist here. Move along.
+            pass
+        else:
+            # 2023/03/30 Add handling for multiple certs in each input
+            # LOOP THROUGH THE CERTS IN misc_c
+            base64decode = False
+            certpem = misc_c
+            if base64decode:
+                certpem = base64.b64decode(misc_c)
+            for certloop in certsplit(certpem):
+                if base64decode:
+                    certloop = base64.b64encode(certloop)
+                (cert_subject,
+                 cert_expiry_date,
+                 time_remaining,
+                 cert_serial,
+                 issuer) = load_and_handle_cert(certloop, now, base64decode=base64decode, ans_module=module)
+
+                expire_check_result = {
+                    'cert_cn': cert_subject,
+                    'path': misc_path,
+                    'expiry': cert_expiry_date,
+                    'days_remaining': time_remaining.days,
+                    'health': None,
+                    'serial': cert_serial,
+                    'issuer': issuer
+                }
+
+                classify_cert(expire_check_result, now, time_remaining, expire_window, misc_routes)
+
+    ######################################################################
     # /Check router/registry certs
     ######################################################################
 
-    res = tabulate_summary(ocp_certs, kubeconfigs, etcd_certs, router_certs, registry_certs, misc_secrets)
+    res = tabulate_summary(ocp_certs, kubeconfigs, etcd_certs, router_certs, registry_certs, misc_secrets, misc_routes)
     warn_certs = bool(res['expired'] + res['warning'])
     msg = "Checked {count} total certificates. Expired/Warning/OK: {exp}/{warn}/{ok}. Warning window: {window} days".format(
         count=res['total'],
@@ -996,6 +1074,7 @@ an OpenShift Container Platform cluster
         check_results['registry'] = [crt for crt in registry_certs if crt['health'] in ['expired', 'warning']]
         check_results['router'] = [crt for crt in router_certs if crt['health'] in ['expired', 'warning']]
         check_results['secrets'] = [crt for crt in misc_secrets if crt['health'] in ['expired', 'warning']]
+        check_results['routes'] = [crt for crt in misc_routes if crt['health'] in ['expired', 'warning']]
     else:
         check_results['ocp_certs'] = ocp_certs
         check_results['kubeconfigs'] = kubeconfigs
@@ -1003,6 +1082,7 @@ an OpenShift Container Platform cluster
         check_results['registry'] = registry_certs
         check_results['router'] = router_certs
         check_results['secrets'] = misc_secrets
+        check_results['routes'] = misc_routes
 
     # Sort the final results to report in order of ascending safety
     # time. That is to say, the certificates which will expire sooner
