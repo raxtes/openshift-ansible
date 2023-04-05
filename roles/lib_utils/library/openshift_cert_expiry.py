@@ -977,7 +977,7 @@ an OpenShift Container Platform cluster
                 classify_cert(expire_check_result, now, time_remaining, expire_window, misc_secrets)
 
     ######################################################################
-    # Now for misc router certs
+    # Now for misc route certs
     # 2023/03/30 Added extra oc cert checks
     ######################################################################
     misc_routes = []
