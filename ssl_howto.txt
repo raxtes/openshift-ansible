@@ -22,6 +22,8 @@ $ ll ~/cert-expiry-report*
 # Set this var to the correct report for convenience
 $ export REPORT='cert-expiry-report.......json'
 
+# run the ssl_summary.sh script to aggregate/analyze the REPORT data.
+$ sh ssl_summary.sh > myoutput.txt
 
 #######################################################
 
@@ -46,7 +48,13 @@ $ cat $REPORT | jq '.summary'
 }
 
 # see keys/sections/nodenames
-$ cat $REPORT | jq '.[] | keys'
+$ cat $REPORT | jq '.data | keys'
+
+# whats in node-003?
+$ cat $REPORT | jq '.data["node-003.iad3.prod.rsi.rackspace.net"]'
+
+# fancy jq
+$ cat $REPORT | jq '.data["node-003.iad3.prod.rsi.rackspace.net"].ocp_certs[] | select(.days_remaining<90) | {expiry,cert_cn,issuer,path}'
 
 #######################################################
 # Expired Certs - based on when the report ran (the file paths might be on master, etcd, nodes, etc.)
@@ -86,3 +94,5 @@ $ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.rou
 
 ======================================================
 
+Search for 'Digicert'
+cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | (select (.issuer | test("C=US, O=DigiCert"))) | {expiry,cert_cn,issuer,path}' -c | sort | uniq -c

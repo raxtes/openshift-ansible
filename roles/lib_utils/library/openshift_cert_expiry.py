@@ -240,8 +240,8 @@ object"""
 
 
 ######################################################################
-
-# 2023/03/30 Add handling for multiple certs in each input
+# 2023/03/30 RARE-1033 Add handling for multiple certs in each input
+######################################################################
 def certsplit(pem):
     """`pem` - Split cert text into array
     """
@@ -903,7 +903,7 @@ an OpenShift Container Platform cluster
 
     ######################################################################
     # Now for misc secrets certs
-    # 2023/03/30 Added extra oc cert checks
+    # 2023/03/30 RARE-1033 Added extra oc cert checks
     ######################################################################
     misc_secrets = []
     misc_secrets_list = []
@@ -913,8 +913,8 @@ an OpenShift Container Platform cluster
     misc_secrets_list.append(['default','router-external-certs','tls.crt'])
     misc_secrets_list.append(['kube-service-catalog','apiserver-ssl','tls.crt'])
     misc_secrets_list.append(['kube-service-catalog','service-catalog-ssl','tls.crt'])
-    misc_secrets_list.append(['openshift-ansible-service-broker','asb-tls','tls.crt'])
-    misc_secrets_list.append(['openshift-ansible-service-broker','etcd-tls','tls.crt'])
+    #misc_secrets_list.append(['openshift-ansible-service-broker','asb-tls','tls.crt'])
+    #misc_secrets_list.append(['openshift-ansible-service-broker','etcd-tls','tls.crt'])
     misc_secrets_list.append(['openshift-console','console-serving-cert','tls.crt'])
     misc_secrets_list.append(['openshift-infra','hawkular-cassandra-certs','tls.client.truststore.crt'])
     misc_secrets_list.append(['openshift-infra','hawkular-cassandra-certs','tls.crt'])
@@ -978,7 +978,7 @@ an OpenShift Container Platform cluster
 
     ######################################################################
     # Now for misc route certs
-    # 2023/03/30 Added extra oc cert checks
+    # 2023/03/30 RARE-1033 Added extra oc cert checks
     ######################################################################
     misc_routes = []
     misc_routes_list = []
@@ -1000,6 +1000,15 @@ an OpenShift Container Platform cluster
     misc_routes_list.append(['openshift-infra','hawkular-metrics','certificate'])
     misc_routes_list.append(['openshift-infra','hawkular-metrics','caCertificate'])
     misc_routes_list.append(['openshift-infra','hawkular-metrics','destinationCACertificate'])
+    misc_routes_list.append(['openshift-monitoring','alertmanager-main','certificate'])
+    misc_routes_list.append(['openshift-monitoring','alertmanager-main','caCertificate'])
+    misc_routes_list.append(['openshift-monitoring','alertmanager-main','destinationCACertificate'])
+    misc_routes_list.append(['openshift-monitoring','grafana','certificate'])
+    misc_routes_list.append(['openshift-monitoring','grafana','caCertificate'])
+    misc_routes_list.append(['openshift-monitoring','grafana','destinationCACertificate'])
+    misc_routes_list.append(['openshift-monitoring','prometheus-k8s','certificate'])
+    misc_routes_list.append(['openshift-monitoring','prometheus-k8s','caCertificate'])
+    misc_routes_list.append(['openshift-monitoring','prometheus-k8s','destinationCACertificate'])
 
     for misc_ns,misc_route,misc_field in misc_routes_list:
 

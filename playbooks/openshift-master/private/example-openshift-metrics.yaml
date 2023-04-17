@@ -1,0 +1,7 @@
+# RARE-1040 Playbook created based on examples provided.
+# Use AS IS.
+
+- name: Configure openshift-metrics
+  hosts: oo_first_master
+  roles:
+  - role: openshift_metrics
