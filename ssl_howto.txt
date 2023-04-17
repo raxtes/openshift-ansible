@@ -12,9 +12,9 @@ $ git branch
 
 # Run Ansible to see what certs are expiring
 # Make sure you are logged in with oc to the desired DC
-$ time ansible-playbook -Ki lon3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
-$ time ansible-playbook -Ki iad3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
-$ time ansible-playbook -Ki ord1 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
+$ time ansible-playbook -Ki ssl-lon3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
+$ time ansible-playbook -Ki ssl-iad3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
+$ time ansible-playbook -Ki ssl-ord1 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
 
 # script places the file in ~ home
 $ ll ~/cert-expiry-report*
