@@ -591,6 +591,14 @@ an OpenShift Container Platform cluster
                         namedCertKey = 'namedCertificate-{}'.format(i)
                         cert_meta[namedCertKey] = os.path.join(cfg_path, v.get('certFile'))
 
+            #
+            # 2023/03/30 RARE-1033 Add extra files to check
+            #
+            if os.path.exists(os.path.realpath('/etc/origin/master/ca.crt')):
+                cert_meta['masterCAFile'] = '/etc/origin/master/ca.crt'
+            if os.path.exists(os.path.realpath('/etc/origin/master/ca-bundle.crt')):
+                cert_meta['masterCAbundleFile'] = '/etc/origin/master/ca-bundle.crt'
+
         ######################################################################
         # Load the certificate and the CA, parse their expiration dates into
         # datetime objects so we can manipulate them later
@@ -904,6 +912,7 @@ an OpenShift Container Platform cluster
     ######################################################################
     # Now for misc secrets certs
     # 2023/03/30 RARE-1033 Added extra oc cert checks
+    # https://docs.openshift.com/container-platform/3.11/dev_guide/secrets.html#service-serving-certificate-secrets
     ######################################################################
     misc_secrets = []
     misc_secrets_list = []
