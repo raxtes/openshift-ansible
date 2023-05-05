@@ -922,8 +922,8 @@ an OpenShift Container Platform cluster
     misc_secrets_list.append(['default','router-external-certs','tls.crt'])
     misc_secrets_list.append(['kube-service-catalog','apiserver-ssl','tls.crt'])
     misc_secrets_list.append(['kube-service-catalog','service-catalog-ssl','tls.crt'])
-    #misc_secrets_list.append(['openshift-ansible-service-broker','asb-tls','tls.crt'])
-    #misc_secrets_list.append(['openshift-ansible-service-broker','etcd-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-ansible-service-broker','asb-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-ansible-service-broker','etcd-tls','tls.crt'])
     misc_secrets_list.append(['openshift-console','console-serving-cert','tls.crt'])
     misc_secrets_list.append(['openshift-infra','hawkular-cassandra-certs','tls.client.truststore.crt'])
     misc_secrets_list.append(['openshift-infra','hawkular-cassandra-certs','tls.crt'])
@@ -931,6 +931,7 @@ an OpenShift Container Platform cluster
     misc_secrets_list.append(['openshift-infra','hawkular-metrics-certs','ca.crt'])
     misc_secrets_list.append(['openshift-infra','hawkular-metrics-certs','tls.crt'])
     misc_secrets_list.append(['openshift-infra','hawkular-metrics-certs','tls.truststore.crt'])
+    misc_secrets_list.append(['openshift-infra','heapster-certs','tls.crt'])
     misc_secrets_list.append(['openshift-monitoring','alertmanager-main-tls','tls.crt'])
     misc_secrets_list.append(['openshift-monitoring','grafana-tls','tls.crt'])
     misc_secrets_list.append(['openshift-monitoring','kube-state-metrics-tls','tls.crt'])
@@ -938,6 +939,9 @@ an OpenShift Container Platform cluster
     misc_secrets_list.append(['openshift-monitoring','prometheus-k8s-tls','tls.crt'])
     misc_secrets_list.append(['openshift-template-service-broker','apiserver-serving-cert','tls.crt'])
     misc_secrets_list.append(['openshift-web-console','webconsole-serving-cert','tls.crt'])
+
+    # do we care about these secrets? presumably these things dont work
+    #openshift-infra heapster-certs tls.crt (per Edward chat 23/03/28)
 
     for misc_ns,misc_secret,misc_field in misc_secrets_list:
 
@@ -947,7 +951,7 @@ an OpenShift Container Platform cluster
                                                     stdout=subprocess.PIPE)
             misc_ds = yaml.load(misc_secrets_list_raw.communicate()[0])
             misc_c = misc_ds['data'][misc_field]
-            misc_path = misc_ds['metadata']['selfLink']
+	    misc_path = misc_ds['metadata']['selfLink'] + '/' + misc_field
         except TypeError:
             # YAML couldn't load the result, this is not a master
             pass
@@ -1006,6 +1010,12 @@ an OpenShift Container Platform cluster
     misc_routes_list.append(['default','registry-console','certificate'])
     misc_routes_list.append(['default','registry-console','caCertificate'])
     misc_routes_list.append(['default','registry-console','destinationCACertificate'])
+    misc_routes_list.append(['openshift-ansible-service-broker','asb-1338','certificate'])
+    misc_routes_list.append(['openshift-ansible-service-broker','asb-1338','caCertificate'])
+    misc_routes_list.append(['openshift-ansible-service-broker','asb-1338','destinationCACertificate'])
+    misc_routes_list.append(['openshift-console','console','certificate'])
+    misc_routes_list.append(['openshift-console','console','caCertificate'])
+    misc_routes_list.append(['openshift-console','console','destinationCACertificate'])
     misc_routes_list.append(['openshift-infra','hawkular-metrics','certificate'])
     misc_routes_list.append(['openshift-infra','hawkular-metrics','caCertificate'])
     misc_routes_list.append(['openshift-infra','hawkular-metrics','destinationCACertificate'])
@@ -1019,6 +1029,10 @@ an OpenShift Container Platform cluster
     misc_routes_list.append(['openshift-monitoring','prometheus-k8s','caCertificate'])
     misc_routes_list.append(['openshift-monitoring','prometheus-k8s','destinationCACertificate'])
 
+    # do we care about these routes?
+    # just uses default cert? # doesnt work?# openshift-ansible-service-broker asb-1338 asb-1338-openshift-ansible-service-broker.devapps.rsi.rackspace.net
+    # just uses default cert # openshift-console console console.devapps.rsi.rackspace.net
+
     for misc_ns,misc_route,misc_field in misc_routes_list:
 
         try:
@@ -1027,7 +1041,7 @@ an OpenShift Container Platform cluster
                                                     stdout=subprocess.PIPE)
             misc_ds = yaml.load(misc_routes_list_raw.communicate()[0])
             misc_c = misc_ds['spec']['tls'][misc_field]
-            misc_path = misc_ds['metadata']['selfLink']
+            misc_path = misc_ds['metadata']['selfLink'] + '/' + misc_field
         except TypeError:
             # YAML couldn't load the result, this is not a master
             pass

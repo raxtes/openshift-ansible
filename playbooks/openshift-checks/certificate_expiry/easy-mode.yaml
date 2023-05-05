@@ -15,7 +15,6 @@
 
 - name: Check cert expirys
   hosts: nodes:masters:etcd
-  serial: 25
   # Don't want to use gather_facts module which requires a lot of time to run
   gather_facts: false
   vars:
