@@ -832,7 +832,7 @@ an OpenShift Container Platform cluster
                                               stdout=subprocess.PIPE)
         router_ds = yaml.load(router_secrets_raw.communicate()[0])
         router_c = router_ds['data']['tls.crt']
-        router_path = router_ds['metadata']['selfLink']
+        router_path = router_ds['metadata']['selfLink'] + '/tls.crt'
     except TypeError:
         # YAML couldn't load the result, this is not a master
         pass
@@ -874,7 +874,7 @@ an OpenShift Container Platform cluster
                                                 stdout=subprocess.PIPE)
         registry_ds = yaml.load(registry_secrets_raw.communicate()[0])
         registry_c = registry_ds['data']['registry.crt']
-        registry_path = registry_ds['metadata']['selfLink']
+        registry_path = registry_ds['metadata']['selfLink'] + '/registry.crt'
     except TypeError:
         # YAML couldn't load the result, this is not a master
         pass
