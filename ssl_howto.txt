@@ -16,9 +16,8 @@ $ git branch
 * list-ssl-3.11
 
 $ cd openshift-ansible
-$ ansible-playbook -kKi ssl-lon3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
-$ ansible-playbook -kKi ssl-iad3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
-$ ansible-playbook -kKi ssl-ord1 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
+$ export $INVENTORY=<inventory file>
+$ ansible-playbook -kKi $INVENTORY playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
 
 # script places the report file in ~ home
 $ ll ~/cert-expiry-report*
