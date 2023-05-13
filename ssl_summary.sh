@@ -1,14 +1,15 @@
 # 2023/04 Melissa England RARE-1033
 #
-# Summarize JSON results from easy-mode openshift script.  Set REPORT to the output file from easy-mode.
+# Summarize JSON results from easy-mode openshift script.
+# Set REPORT to the output file from easy-mode.
 #
 # Example usage:
 #
-# EXPORT VAR
+# Export Method
 # export REPORT=cert-expiry-report.20230411T003734.json
 # sh ssl_summary.sh > myoutput.txt
 #
-# INLINE VAR
+# Inline Method
 # REPORT=cert-expiry-report.20230411T003734.json sh ssl_summary.sh > myoutput.txt
 
 if [[ -z "$REPORT" ]]; then
@@ -63,8 +64,8 @@ echo "LIST ALL CERTS - unique"
 cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | {cert_cn,issuer,path,expiry}' -c | sort | uniq | jq -c
 echo "##################################################################"
 echo "SECTION NAMES"
-cat $REPORT | egrep '^      "' | awk -F'"' '{print $2}' | sort | uniq -c
+cat $REPORT | jq '.data[] | keys' | jq '.[]' -r | sort | uniq -c
 echo "##################################################################"
-echo "NODES / KEYS"
-cat $REPORT | jq '.[] | keys'
+echo "NODES"
+cat $REPORT | jq '.data | keys' | jq '.[]' -r
 echo "##################################################################"

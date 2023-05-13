@@ -1,22 +1,26 @@
 # 2023/04/03 Melissa England RARE-1033
-# OPENSHIFT3.11 REQUIRES OLD ANSIBLE 2.6 ... run it on TOOLBOX
+# OPENSHIFT3.11 REQUIRES OLD ANSIBLE 2.6 ... run it on TOOLBOX nodes
 # https://github.com/openshift/openshift-ansible/issues/11628
 ansible --version
 
 ## all these commands are adhoc for the commandline - this is not a script
 
+# Run Ansible to see what certs are expiring
 # This is the branch I created based on branch "release-3.11" 
+# There are significant fixes and enhancements, so its critical to use this branch.
+# The script now takes only a couple of minutes to complete.
+# It is not required to be logged in with oc on the toolbox.
+
 $ git clone git@github.com:raxtes/openshift-ansible.git --branch list-ssl-3.11
 $ git branch
 * list-ssl-3.11
 
-# Run Ansible to see what certs are expiring
-# Make sure you are logged in with oc to the desired DC
-$ time ansible-playbook -Ki ssl-lon3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
-$ time ansible-playbook -Ki ssl-iad3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
-$ time ansible-playbook -Ki ssl-ord1 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
+$ cd openshift-ansible
+$ ansible-playbook -kKi ssl-lon3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
+$ ansible-playbook -kKi ssl-iad3 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
+$ ansible-playbook -kKi ssl-ord1 playbooks/openshift-checks/certificate_expiry/easy-mode.yaml -e "my_date=`date +%Y%m%dT%H%M%S`"
 
-# script places the file in ~ home
+# script places the report file in ~ home
 $ ll ~/cert-expiry-report*
 
 # Set this var to the correct report for convenience
@@ -27,8 +31,8 @@ $ sh ssl_summary.sh > myoutput.txt
 
 #######################################################
 
-# what kind of data here
-$ cat $REPORT | egrep '^      "' | awk -F'"' '{print $2}' | sort | uniq -c
+# what kind of data is here?
+$ cat $REPORT | jq '.data[] | keys' | jq '.[]' -r | sort | uniq -c
      34 etcd
      34 kubeconfigs
      34 meta
@@ -42,30 +46,44 @@ $ cat $REPORT | egrep '^      "' | awk -F'"' '{print $2}' | sort | uniq -c
 $ cat $REPORT | jq '.summary'
 {
   "expired": 6,
-  "ok": 62,
-  "total": 175,
-  "warning": 107
+  "ok": 717,
+  "total": 729,
+  "warning": 6
 }
 
 # see keys/sections/nodenames
-$ cat $REPORT | jq '.data | keys'
+$ cat $REPORT | jq '.data | keys' | jq '.[]' -r
 
 # whats in node-003?
 $ cat $REPORT | jq '.data["node-003.iad3.prod.rsi.rackspace.net"]'
 
-# fancy jq
+# some fancy jq
 $ cat $REPORT | jq '.data["node-003.iad3.prod.rsi.rackspace.net"].ocp_certs[] | select(.days_remaining<90) | {expiry,cert_cn,issuer,path}'
+
+# Count ALL - UNIQUE
+$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | {cert_cn,issuer,path,expiry}' -c | sort | uniq | wc -l
+59
+
+# Count ALL - NON UNIQUE
+$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | {cert_cn,issuer,path,expiry}' -c | wc -l
+175
 
 #######################################################
 # Expired Certs - based on when the report ran (the file paths might be on master, etcd, nodes, etc.)
 $ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | (select (.health | test("expired"))) | {expiry,cert_cn,issuer,path}' -c | sort | uniq | jq -c
 
 #######################################################
-# Search by Expiry Date REGEX (the file paths might be on master, etcd, nodes, etc.)
+# Search by specific Expiry Date REGEX (the file paths might be on master, etcd, nodes, etc.)
 $ export EXPIRY='2023-0[1-3]'; cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | (select (.expiry | test("'$EXPIRY'"))) | {expiry,cert_cn,issuer,path}' -c | sort | uniq | jq -c
 
 #######################################################
-# List ALL - only dates
+# Search by Expiry Date REGEX - how many months from today?
+$ export EXPIRY=`date --date='+0 months' '+%Y-%m'`; cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | (select (.expiry | test("'$EXPIRY'"))) | {expiry,cert_cn,issuer,path}' -c | sort | uniq | jq -c
+$ export EXPIRY=`date --date='+1 months' '+%Y-%m'`; cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | (select (.expiry | test("'$EXPIRY'"))) | {expiry,cert_cn,issuer,path}' -c | sort | uniq | jq -c
+$ export EXPIRY=`date --date='+2 months' '+%Y-%m'`; cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | (select (.expiry | test("'$EXPIRY'"))) | {expiry,cert_cn,issuer,path}' -c | sort | uniq | jq -c
+
+#######################################################
+# List ALL - only expiration dates
 $ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | .expiry' -r | awk '{print $1}' | sort | uniq -c
 
 #######################################################
@@ -83,14 +101,6 @@ $ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.rou
 #######################################################
 # List ALL 
 $ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | {cert_cn,issuer,path,expiry}' -c | sort | uniq | jq -c
-
-# Count ALL - UNIQUE
-$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | {cert_cn,issuer,path,expiry}' -c | sort | uniq | wc -l
-59
-
-# Count ALL - NON UNIQUE
-$ cat $REPORT | jq '.[][] | .etcd[],.kubeconfigs[],.ocp_certs[],.registry[],.router[],.secrets[],.routes[] | {cert_cn,issuer,path,expiry}' -c | wc -l
-175
 
 ======================================================
 
