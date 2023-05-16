@@ -240,6 +240,18 @@ object"""
 
 
 ######################################################################
+# 2023/03/30 RARE-1033 Add handling for multiple certs in each input
+######################################################################
+def certsplit(pem):
+    """`pem` - Split cert text into array
+    """
+    start_line = b'-----BEGIN CERTIFICATE-----'
+    result = []
+    certarray = pem.split(start_line)
+    for single in certarray[1:]:
+        result.append(start_line+single)
+    return result
+
 def filter_paths(path_list):
     """`path_list` - A list of file paths to check. Only files which exist
 will be returned
@@ -381,7 +393,7 @@ Return:
     return cert_list
 
 
-def tabulate_summary(certificates, kubeconfigs, etcd_certs, router_certs, registry_certs):
+def tabulate_summary(certificates, kubeconfigs, etcd_certs, router_certs, registry_certs, misc_secrets, misc_routes):
     """Calculate the summary text for when the module finishes
 running. This includes counts of each classification and what have
 you.
@@ -398,7 +410,7 @@ Return:
 - `summary_results` (dict) - Counts of each cert type classification
   and total items examined.
     """
-    items = certificates + kubeconfigs + etcd_certs + router_certs + registry_certs
+    items = certificates + kubeconfigs + etcd_certs + router_certs + registry_certs + misc_secrets + misc_routes
 
     summary_results = {
         'system_certificates': len(certificates),
@@ -406,6 +418,8 @@ Return:
         'etcd_certificates': len(etcd_certs),
         'router_certs': len(router_certs),
         'registry_certs': len(registry_certs),
+        'secrets': len(misc_secrets),
+        'routes': len(misc_routes),
         'total': len(items),
         'ok': 0,
         'warning': 0,
@@ -449,6 +463,9 @@ an OpenShift Container Platform cluster
         ),
         supports_check_mode=True,
     )
+
+    # set default value
+    base64decode=False
 
     # Basic scaffolding for OpenShift specific certs
     openshift_base_config_path = os.path.realpath(module.params['config_base'])
@@ -574,29 +591,45 @@ an OpenShift Container Platform cluster
                         namedCertKey = 'namedCertificate-{}'.format(i)
                         cert_meta[namedCertKey] = os.path.join(cfg_path, v.get('certFile'))
 
+            #
+            # 2023/03/30 RARE-1033 Add extra files to check
+            #
+            if os.path.exists(os.path.realpath('/etc/origin/master/ca.crt')):
+                cert_meta['masterCAFile'] = '/etc/origin/master/ca.crt'
+            if os.path.exists(os.path.realpath('/etc/origin/master/ca-bundle.crt')):
+                cert_meta['masterCAbundleFile'] = '/etc/origin/master/ca-bundle.crt'
+
         ######################################################################
         # Load the certificate and the CA, parse their expiration dates into
         # datetime objects so we can manipulate them later
         for v in cert_meta.values():
             with io.open(v, 'r', encoding='utf-8') as fp:
                 cert = fp.read()
-                (cert_subject,
-                 cert_expiry_date,
-                 time_remaining,
-                 cert_serial,
-                 issuer) = load_and_handle_cert(cert, now, ans_module=module)
+                # 2023/03/30 Add handling for multiple certs in each input
+                # LOOP THROUGH THE CERTS IN cert
+                certpem = cert
+                if base64decode:
+                    certpem = base64.b64decode(cert)
+                for certloop in certsplit(certpem):
+                    if base64decode:
+                        certloop = base64.b64encode(certloop)
+                    (cert_subject,
+                     cert_expiry_date,
+                     time_remaining,
+                     cert_serial,
+                     issuer) = load_and_handle_cert(certloop, now, ans_module=module)
 
-                expire_check_result = {
-                    'cert_cn': cert_subject,
-                    'path': fp.name,
-                    'expiry': cert_expiry_date,
-                    'days_remaining': time_remaining.days,
-                    'health': None,
-                    'serial': cert_serial,
-                    'issuer': issuer
-                }
+                    expire_check_result = {
+                        'cert_cn': cert_subject,
+                        'path': fp.name,
+                        'expiry': cert_expiry_date,
+                        'days_remaining': time_remaining.days,
+                        'health': None,
+                        'serial': cert_serial,
+                        'issuer': issuer
+                    }
 
-                classify_cert(expire_check_result, now, time_remaining, expire_window, ocp_certs)
+                    classify_cert(expire_check_result, now, time_remaining, expire_window, ocp_certs)
 
     ######################################################################
     # /Check for OpenShift Container Platform specific certs
@@ -644,23 +677,31 @@ an OpenShift Container Platform cluster
             if not c:
                 # This is not a node
                 raise IOError
-            (cert_subject,
-             cert_expiry_date,
-             time_remaining,
-             cert_serial,
-             issuer) = load_and_handle_cert(c, now, base64decode=base64decode, ans_module=module)
+            # 2023/03/30 Add handling for multiple certs in each input
+            # LOOP THROUGH THE CERTS IN c (should there be only one?)
+            certpem = c
+            if base64decode:
+                certpem = base64.b64decode(c)
+            for certloop in certsplit(certpem):
+                if base64decode:
+                    certloop = base64.b64encode(certloop)
+                (cert_subject,
+                 cert_expiry_date,
+                 time_remaining,
+                 cert_serial,
+                 issuer) = load_and_handle_cert(certloop, now, base64decode=base64decode, ans_module=module)
 
-            expire_check_result = {
-                'cert_cn': cert_subject,
-                'path': fp.name,
-                'expiry': cert_expiry_date,
-                'days_remaining': time_remaining.days,
-                'health': None,
-                'serial': cert_serial,
-                'issuer': issuer
-            }
+                expire_check_result = {
+                    'cert_cn': cert_subject,
+                    'path': fp.name,
+                    'expiry': cert_expiry_date,
+                    'days_remaining': time_remaining.days,
+                    'health': None,
+                    'serial': cert_serial,
+                    'issuer': issuer
+                }
 
-            classify_cert(expire_check_result, now, time_remaining, expire_window, kubeconfigs)
+                classify_cert(expire_check_result, now, time_remaining, expire_window, kubeconfigs)
         except IOError:
             # This is not a node
             pass
@@ -676,23 +717,32 @@ an OpenShift Container Platform cluster
         # the user at index 0 in the 'users' list. There should
         # not be more than one user.
         c = cfg['users'][0]['user']['client-certificate-data']
-        (cert_subject,
-         cert_expiry_date,
-         time_remaining,
-         cert_serial,
-         issuer) = load_and_handle_cert(c, now, base64decode=True, ans_module=module)
+        # 2023/03/30 Add handling for multiple certs in each input
+        # LOOP THROUGH THE CERTS IN c (should there be only one?)
+        base64decode = True
+        certpem = c
+        if base64decode:
+            certpem = base64.b64decode(c)
+        for certloop in certsplit(certpem):
+            if base64decode:
+                certloop = base64.b64encode(certloop)
+            (cert_subject,
+             cert_expiry_date,
+             time_remaining,
+             cert_serial,
+             issuer) = load_and_handle_cert(certloop, now, base64decode=True, ans_module=module)
 
-        expire_check_result = {
-            'cert_cn': cert_subject,
-            'path': fp.name,
-            'expiry': cert_expiry_date,
-            'days_remaining': time_remaining.days,
-            'health': None,
-            'serial': cert_serial,
-            'issuer': issuer
-        }
+            expire_check_result = {
+                'cert_cn': cert_subject,
+                'path': fp.name,
+                'expiry': cert_expiry_date,
+                'days_remaining': time_remaining.days,
+                'health': None,
+                'serial': cert_serial,
+                'issuer': issuer
+            }
 
-        classify_cert(expire_check_result, now, time_remaining, expire_window, kubeconfigs)
+            classify_cert(expire_check_result, now, time_remaining, expire_window, kubeconfigs)
 
     ######################################################################
     # /Check service Kubeconfigs
@@ -734,23 +784,31 @@ an OpenShift Container Platform cluster
     for etcd_cert in filter_paths(etcd_certs_to_check):
         with io.open(etcd_cert, 'r', encoding='utf-8') as fp:
             c = fp.read()
-            (cert_subject,
-             cert_expiry_date,
-             time_remaining,
-             cert_serial,
-             issuer) = load_and_handle_cert(c, now, ans_module=module)
+            # 2023/03/30 Add handling for multiple certs in each input
+            # LOOP THROUGH THE CERTS IN c (should there be only one?)
+            certpem = c
+            if base64decode:
+                certpem = base64.b64decode(c)
+            for certloop in certsplit(certpem):
+                if base64decode:
+                    certloop = base64.b64encode(certloop)
+                (cert_subject,
+                 cert_expiry_date,
+                 time_remaining,
+                 cert_serial,
+                 issuer) = load_and_handle_cert(certloop, now, ans_module=module)
 
-            expire_check_result = {
-                'cert_cn': cert_subject,
-                'path': fp.name,
-                'expiry': cert_expiry_date,
-                'days_remaining': time_remaining.days,
-                'health': None,
-                'serial': cert_serial,
-                'issuer': issuer
-            }
+                expire_check_result = {
+                    'cert_cn': cert_subject,
+                    'path': fp.name,
+                    'expiry': cert_expiry_date,
+                    'days_remaining': time_remaining.days,
+                    'health': None,
+                    'serial': cert_serial,
+                    'issuer': issuer
+                }
 
-            classify_cert(expire_check_result, now, time_remaining, expire_window, etcd_certs)
+                classify_cert(expire_check_result, now, time_remaining, expire_window, etcd_certs)
 
     ######################################################################
     # /Check etcd certs
@@ -774,7 +832,7 @@ an OpenShift Container Platform cluster
                                               stdout=subprocess.PIPE)
         router_ds = yaml.load(router_secrets_raw.communicate()[0])
         router_c = router_ds['data']['tls.crt']
-        router_path = router_ds['metadata']['selfLink']
+        router_path = router_ds['metadata']['selfLink'] + '/tls.crt'
     except TypeError:
         # YAML couldn't load the result, this is not a master
         pass
@@ -782,23 +840,32 @@ an OpenShift Container Platform cluster
         # The OC command doesn't exist here. Move along.
         pass
     else:
-        (cert_subject,
-         cert_expiry_date,
-         time_remaining,
-         cert_serial,
-         issuer) = load_and_handle_cert(router_c, now, base64decode=True, ans_module=module)
+        # 2023/03/30 Add handling for multiple certs in each input
+        # LOOP THROUGH THE CERTS IN router_c
+        base64decode = True
+        certpem = router_c
+        if base64decode:
+            certpem = base64.b64decode(router_c)
+        for certloop in certsplit(certpem):
+            if base64decode:
+                certloop = base64.b64encode(certloop)
+            (cert_subject,
+             cert_expiry_date,
+             time_remaining,
+             cert_serial,
+             issuer) = load_and_handle_cert(certloop, now, base64decode=True, ans_module=module)
 
-        expire_check_result = {
-            'cert_cn': cert_subject,
-            'path': router_path,
-            'expiry': cert_expiry_date,
-            'days_remaining': time_remaining.days,
-            'health': None,
-            'serial': cert_serial,
-            'issuer': issuer
-        }
+            expire_check_result = {
+                'cert_cn': cert_subject,
+                'path': router_path,
+                'expiry': cert_expiry_date,
+                'days_remaining': time_remaining.days,
+                'health': None,
+                'serial': cert_serial,
+                'issuer': issuer
+            }
 
-        classify_cert(expire_check_result, now, time_remaining, expire_window, router_certs)
+            classify_cert(expire_check_result, now, time_remaining, expire_window, router_certs)
 
     ######################################################################
     # Now for registry
@@ -807,7 +874,7 @@ an OpenShift Container Platform cluster
                                                 stdout=subprocess.PIPE)
         registry_ds = yaml.load(registry_secrets_raw.communicate()[0])
         registry_c = registry_ds['data']['registry.crt']
-        registry_path = registry_ds['metadata']['selfLink']
+        registry_path = registry_ds['metadata']['selfLink'] + '/registry.crt'
     except TypeError:
         # YAML couldn't load the result, this is not a master
         pass
@@ -815,29 +882,208 @@ an OpenShift Container Platform cluster
         # The OC command doesn't exist here. Move along.
         pass
     else:
-        (cert_subject,
-         cert_expiry_date,
-         time_remaining,
-         cert_serial,
-         issuer) = load_and_handle_cert(registry_c, now, base64decode=True, ans_module=module)
+        # 2023/03/30 Add handling for multiple certs in each input
+        # LOOP THROUGH THE CERTS IN registry_c
+        base64decode = True
+        certpem = registry_c
+        if base64decode:
+            certpem = base64.b64decode(registry_c)
+        for certloop in certsplit(certpem):
+            if base64decode:
+                certloop = base64.b64encode(certloop)
+            (cert_subject,
+             cert_expiry_date,
+             time_remaining,
+             cert_serial,
+             issuer) = load_and_handle_cert(certloop, now, base64decode=True, ans_module=module)
 
-        expire_check_result = {
-            'cert_cn': cert_subject,
-            'path': registry_path,
-            'expiry': cert_expiry_date,
-            'days_remaining': time_remaining.days,
-            'health': None,
-            'serial': cert_serial,
-            'issuer': issuer
-        }
+            expire_check_result = {
+                'cert_cn': cert_subject,
+                'path': registry_path,
+                'expiry': cert_expiry_date,
+                'days_remaining': time_remaining.days,
+                'health': None,
+                'serial': cert_serial,
+                'issuer': issuer
+            }
 
-        classify_cert(expire_check_result, now, time_remaining, expire_window, registry_certs)
+            classify_cert(expire_check_result, now, time_remaining, expire_window, registry_certs)
+
+    ######################################################################
+    # Now for misc secrets certs
+    # 2023/03/30 RARE-1033 Added extra oc cert checks
+    # https://docs.openshift.com/container-platform/3.11/dev_guide/secrets.html#service-serving-certificate-secrets
+    ######################################################################
+    misc_secrets = []
+    misc_secrets_list = []
+    #these 2 certs are part of registry_certs and router_certs lists
+    #misc_secrets_list.append(['default','registry-certificates','registry.crt'])
+    #misc_secrets_list.append(['default','router-certs','tls.crt'])
+    misc_secrets_list.append(['default','router-external-certs','tls.crt'])
+    misc_secrets_list.append(['kube-service-catalog','apiserver-ssl','tls.crt'])
+    misc_secrets_list.append(['kube-service-catalog','service-catalog-ssl','tls.crt'])
+    misc_secrets_list.append(['openshift-ansible-service-broker','asb-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-ansible-service-broker','etcd-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-console','console-serving-cert','tls.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-cassandra-certs','tls.client.truststore.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-cassandra-certs','tls.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-cassandra-certs','tls.peer.truststore.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-metrics-certs','ca.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-metrics-certs','tls.crt'])
+    misc_secrets_list.append(['openshift-infra','hawkular-metrics-certs','tls.truststore.crt'])
+    misc_secrets_list.append(['openshift-infra','heapster-certs','tls.crt'])
+    misc_secrets_list.append(['openshift-monitoring','alertmanager-main-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-monitoring','grafana-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-monitoring','kube-state-metrics-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-monitoring','node-exporter-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-monitoring','prometheus-k8s-tls','tls.crt'])
+    misc_secrets_list.append(['openshift-template-service-broker','apiserver-serving-cert','tls.crt'])
+    misc_secrets_list.append(['openshift-web-console','webconsole-serving-cert','tls.crt'])
+
+    # do we care about these secrets? presumably these things dont work
+    #openshift-infra heapster-certs tls.crt (per Edward chat 23/03/28)
+
+    for misc_ns,misc_secret,misc_field in misc_secrets_list:
+
+        try:
+            misc_subprocess='oc get -n ' + misc_ns + ' secret ' + misc_secret + ' -o yaml'
+            misc_secrets_list_raw = subprocess.Popen(misc_subprocess.split(),
+                                                    stdout=subprocess.PIPE)
+            misc_ds = yaml.load(misc_secrets_list_raw.communicate()[0])
+            misc_c = misc_ds['data'][misc_field]
+	    misc_path = misc_ds['metadata']['selfLink'] + '/' + misc_field
+        except TypeError:
+            # YAML couldn't load the result, this is not a master
+            pass
+        except OSError:
+            # The OC command doesn't exist here. Move along.
+            pass
+        except KeyError:
+            # Catch the error when oc object not found
+            pass
+        else:
+            # 2023/03/30 Add handling for multiple certs in each input
+            # LOOP THROUGH THE CERTS IN misc_c
+            base64decode = True
+            certpem = misc_c
+            if base64decode:
+                certpem = base64.b64decode(misc_c)
+            for certloop in certsplit(certpem):
+                if base64decode:
+                    certloop = base64.b64encode(certloop)
+                (cert_subject,
+                 cert_expiry_date,
+                 time_remaining,
+                 cert_serial,
+                 issuer) = load_and_handle_cert(certloop, now, base64decode=base64decode, ans_module=module)
+
+                expire_check_result = {
+                    'cert_cn': cert_subject,
+                    'path': misc_path,
+                    'expiry': cert_expiry_date,
+                    'days_remaining': time_remaining.days,
+                    'health': None,
+                    'serial': cert_serial,
+                    'issuer': issuer
+                }
+
+                classify_cert(expire_check_result, now, time_remaining, expire_window, misc_secrets)
+
+    ######################################################################
+    # Now for misc route certs
+    # 2023/03/30 RARE-1033 Added extra oc cert checks
+    ######################################################################
+    misc_routes = []
+    misc_routes_list = []
+    misc_routes_list.append(['default','docker-registry','certificate'])
+    misc_routes_list.append(['default','docker-registry','caCertificate'])
+    misc_routes_list.append(['default','docker-registry','destinationCACertificate'])
+    misc_routes_list.append(['default','docker-registry-new','certificate'])
+    misc_routes_list.append(['default','docker-registry-new','caCertificate'])
+    misc_routes_list.append(['default','docker-registry-new','destinationCACertificate'])
+    misc_routes_list.append(['default','external-registry','certificate'])
+    misc_routes_list.append(['default','external-registry','caCertificate'])
+    misc_routes_list.append(['default','external-registry','destinationCACertificate'])
+    misc_routes_list.append(['default','openshift-master','certificate'])
+    misc_routes_list.append(['default','openshift-master','caCertificate'])
+    misc_routes_list.append(['default','openshift-master','destinationCACertificate'])
+    misc_routes_list.append(['default','registry-console','certificate'])
+    misc_routes_list.append(['default','registry-console','caCertificate'])
+    misc_routes_list.append(['default','registry-console','destinationCACertificate'])
+    misc_routes_list.append(['openshift-ansible-service-broker','asb-1338','certificate'])
+    misc_routes_list.append(['openshift-ansible-service-broker','asb-1338','caCertificate'])
+    misc_routes_list.append(['openshift-ansible-service-broker','asb-1338','destinationCACertificate'])
+    misc_routes_list.append(['openshift-console','console','certificate'])
+    misc_routes_list.append(['openshift-console','console','caCertificate'])
+    misc_routes_list.append(['openshift-console','console','destinationCACertificate'])
+    misc_routes_list.append(['openshift-infra','hawkular-metrics','certificate'])
+    misc_routes_list.append(['openshift-infra','hawkular-metrics','caCertificate'])
+    misc_routes_list.append(['openshift-infra','hawkular-metrics','destinationCACertificate'])
+    misc_routes_list.append(['openshift-monitoring','alertmanager-main','certificate'])
+    misc_routes_list.append(['openshift-monitoring','alertmanager-main','caCertificate'])
+    misc_routes_list.append(['openshift-monitoring','alertmanager-main','destinationCACertificate'])
+    misc_routes_list.append(['openshift-monitoring','grafana','certificate'])
+    misc_routes_list.append(['openshift-monitoring','grafana','caCertificate'])
+    misc_routes_list.append(['openshift-monitoring','grafana','destinationCACertificate'])
+    misc_routes_list.append(['openshift-monitoring','prometheus-k8s','certificate'])
+    misc_routes_list.append(['openshift-monitoring','prometheus-k8s','caCertificate'])
+    misc_routes_list.append(['openshift-monitoring','prometheus-k8s','destinationCACertificate'])
+
+    # do we care about these routes?
+    # just uses default cert? # doesnt work?# openshift-ansible-service-broker asb-1338 asb-1338-openshift-ansible-service-broker.devapps.rsi.rackspace.net
+    # just uses default cert # openshift-console console console.devapps.rsi.rackspace.net
+
+    for misc_ns,misc_route,misc_field in misc_routes_list:
+
+        try:
+            misc_subprocess='oc get -n ' + misc_ns + ' route ' + misc_route + ' -o yaml'
+            misc_routes_list_raw = subprocess.Popen(misc_subprocess.split(),
+                                                    stdout=subprocess.PIPE)
+            misc_ds = yaml.load(misc_routes_list_raw.communicate()[0])
+            misc_c = misc_ds['spec']['tls'][misc_field]
+            misc_path = misc_ds['metadata']['selfLink'] + '/' + misc_field
+        except TypeError:
+            # YAML couldn't load the result, this is not a master
+            pass
+        except OSError:
+            # The OC command doesn't exist here. Move along.
+            pass
+        except KeyError:
+            # Catch the error when oc object not found
+            pass
+        else:
+            # 2023/03/30 Add handling for multiple certs in each input
+            # LOOP THROUGH THE CERTS IN misc_c
+            base64decode = False
+            certpem = misc_c
+            if base64decode:
+                certpem = base64.b64decode(misc_c)
+            for certloop in certsplit(certpem):
+                if base64decode:
+                    certloop = base64.b64encode(certloop)
+                (cert_subject,
+                 cert_expiry_date,
+                 time_remaining,
+                 cert_serial,
+                 issuer) = load_and_handle_cert(certloop, now, base64decode=base64decode, ans_module=module)
+
+                expire_check_result = {
+                    'cert_cn': cert_subject,
+                    'path': misc_path,
+                    'expiry': cert_expiry_date,
+                    'days_remaining': time_remaining.days,
+                    'health': None,
+                    'serial': cert_serial,
+                    'issuer': issuer
+                }
+
+                classify_cert(expire_check_result, now, time_remaining, expire_window, misc_routes)
 
     ######################################################################
     # /Check router/registry certs
     ######################################################################
 
-    res = tabulate_summary(ocp_certs, kubeconfigs, etcd_certs, router_certs, registry_certs)
+    res = tabulate_summary(ocp_certs, kubeconfigs, etcd_certs, router_certs, registry_certs, misc_secrets, misc_routes)
     warn_certs = bool(res['expired'] + res['warning'])
     msg = "Checked {count} total certificates. Expired/Warning/OK: {exp}/{warn}/{ok}. Warning window: {window} days".format(
         count=res['total'],
@@ -856,12 +1102,16 @@ an OpenShift Container Platform cluster
         check_results['etcd'] = [crt for crt in etcd_certs if crt['health'] in ['expired', 'warning']]
         check_results['registry'] = [crt for crt in registry_certs if crt['health'] in ['expired', 'warning']]
         check_results['router'] = [crt for crt in router_certs if crt['health'] in ['expired', 'warning']]
+        check_results['secrets'] = [crt for crt in misc_secrets if crt['health'] in ['expired', 'warning']]
+        check_results['routes'] = [crt for crt in misc_routes if crt['health'] in ['expired', 'warning']]
     else:
         check_results['ocp_certs'] = ocp_certs
         check_results['kubeconfigs'] = kubeconfigs
         check_results['etcd'] = etcd_certs
         check_results['registry'] = registry_certs
         check_results['router'] = router_certs
+        check_results['secrets'] = misc_secrets
+        check_results['routes'] = misc_routes
 
     # Sort the final results to report in order of ascending safety
     # time. That is to say, the certificates which will expire sooner

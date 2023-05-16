@@ -3,7 +3,12 @@ openshift_certificate_expiry_config_base: "/etc/origin"
 openshift_certificate_expiry_warning_days: 365
 openshift_certificate_expiry_show_all: no
 openshift_certificate_expiry_generate_html_report: no
-openshift_certificate_expiry_html_report_path: "{{ lookup('env', 'HOME') }}/cert-expiry-report.{{ ansible_date_time.iso8601_basic_short }}.html"
+
+# Don't want to use gather_facts module which requires a lot of time to run (must pass date on commandline instead)
+#  -e "my_date=`date +%Y%m%dT%H%M%S`"
+#openshift_certificate_expiry_html_report_path: "{{ lookup('env', 'HOME') }}/cert-expiry-report.{{ ansible_date_time.iso8601_basic_short }}.html"
+openshift_certificate_expiry_html_report_path: "{{ lookup('env', 'HOME') }}/cert-expiry-report.{{ my_date | default('000') }}.html"
 openshift_certificate_expiry_save_json_results: no
-openshift_certificate_expiry_json_results_path: "{{ lookup('env', 'HOME') }}/cert-expiry-report.{{ ansible_date_time.iso8601_basic_short }}.json"
+#openshift_certificate_expiry_json_results_path: "{{ lookup('env', 'HOME') }}/cert-expiry-report.{{ ansible_date_time.iso8601_basic_short }}.json"
+openshift_certificate_expiry_json_results_path: "{{ lookup('env', 'HOME') }}/cert-expiry-report.{{ my_date | default('000') }}.json"
 openshift_certificate_expiry_fail_on_warn: false

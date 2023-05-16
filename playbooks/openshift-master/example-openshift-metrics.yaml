@@ -1,0 +1,8 @@
+# RARE-1040 Playbook created based on examples provided.
+# Use AS IS.
+
+---
+- import_playbook: ../init/main.yml
+
+- import_playbook: private/example-openshift-metrics.yaml
+
