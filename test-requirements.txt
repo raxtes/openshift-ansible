@@ -6,7 +6,7 @@ flake8==3.3.0
 flake8-mutable==1.1.0
 flake8-print==2.0.2
 lazy-object-proxy==1.5.2
-pylint==1.6.5
+pylint==4.0.9
 setuptools-lint==0.5.2
 yamllint==1.6.1
 coverage==4.3.4
